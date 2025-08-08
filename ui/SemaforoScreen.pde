@@ -1,3 +1,0 @@
-class SemaforoScreen extends Screen {
-    
-}

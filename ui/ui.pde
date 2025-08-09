@@ -35,13 +35,14 @@ void createScreenSystem() {
   // Crear todas las pantallas
   DashboardScreen dashboardScreen = new DashboardScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   SmokeMonitorScreen smokeScreen = new SmokeMonitorScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
-  
+  DistanceScreen distanceScreen = new DistanceScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   ConfigScreen configScreen = new ConfigScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   
   // Agregar pantallas al gestor en el orden correcto
   screenManager.addScreen(dashboardScreen);  // 0: Dashboard
   screenManager.addScreen(smokeScreen);      // 1: Monitoreo Humo
-  screenManager.addScreen(configScreen);     // Configuración
+  screenManager.addScreen(distanceScreen);   // 2: Distancias
+  screenManager.addScreen(configScreen);     // 3: Configuración
   
   // Activar pantalla inicial (Dashboard)
   screenManager.setActiveScreen(0);
@@ -108,7 +109,7 @@ void keyPressed() {
   }
   
   // Navegación rápida con teclas numéricas
-  if (key >= '1' && key <= '4') {
+  if (key >= '1' && key <= '5') {
     int screenIndex = key - '1';
     screenManager.setActiveScreen(screenIndex);
   }

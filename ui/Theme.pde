@@ -12,6 +12,9 @@ class Theme {
   static final color ORANGE = 0xFFF59E0B;          // color(245, 158, 11)
   static final color RED = 0xFFEF4444;             // color(239, 68, 68)
   static final color BLACK = 0xFF000000;           // color(0)
+  static final color BLUE = 0xFF3B82F6;            // color(59, 130, 246)
+  static final color PURPLE = 0xFF8B5CF6;          // color(139, 92, 246)
+  static final color YELLOW = 0xFFFBBF24;          // color(251, 191, 36)
   
   // Dimensiones
   static final int CARD_WIDTH = 180;

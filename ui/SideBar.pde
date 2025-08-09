@@ -22,9 +22,8 @@ class SideBar {
     String[] menuLabels = {
       "Dashboard", 
       "Monitoreo Humo", 
-
+      "Distancias",
       "Configuración"
-
     };
     
     float itemHeight = 50;

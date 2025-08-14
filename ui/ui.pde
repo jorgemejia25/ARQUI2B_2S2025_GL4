@@ -35,13 +35,24 @@ void createScreenSystem() {
   // Crear todas las pantallas
   DashboardScreen dashboardScreen = new DashboardScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   SmokeMonitorScreen smokeScreen = new SmokeMonitorScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
+<<<<<<< Updated upstream
   
+=======
+  DistanceScreen distanceScreen = new DistanceScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
+  PanicButtonScreen panicScreen = new PanicButtonScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
+>>>>>>> Stashed changes
   ConfigScreen configScreen = new ConfigScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   
   // Agregar pantallas al gestor en el orden correcto
   screenManager.addScreen(dashboardScreen);  // 0: Dashboard
   screenManager.addScreen(smokeScreen);      // 1: Monitoreo Humo
+<<<<<<< Updated upstream
   screenManager.addScreen(configScreen);     // Configuración
+=======
+  screenManager.addScreen(distanceScreen);   // 2: Distancias
+  screenManager.addScreen(panicScreen);      // 3: Pánico
+  screenManager.addScreen(configScreen);     // 4: Configuración
+>>>>>>> Stashed changes
   
   // Activar pantalla inicial (Dashboard)
   screenManager.setActiveScreen(0);

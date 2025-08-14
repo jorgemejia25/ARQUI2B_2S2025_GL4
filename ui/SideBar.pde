@@ -22,7 +22,12 @@ class SideBar {
     String[] menuLabels = {
       "Dashboard", 
       "Monitoreo Humo", 
+<<<<<<< Updated upstream
 
+=======
+      "Distancias",
+      "Pánico",
+>>>>>>> Stashed changes
       "Configuración"
 
     };

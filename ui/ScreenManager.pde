@@ -3,7 +3,7 @@
 class ScreenManager {
   private ArrayList<Screen> screens;
   private int currentScreenIndex = 0;
-  private String[] screenNames = {"Dashboard", "Monitoreo Humo", "Tráfico", "Configuración"};
+  private String[] screenNames = {"Dashboard", "Monitoreo Humo", "Tráfico", "Pánico", "Configuración"};
   
   ScreenManager() {
     screens = new ArrayList<Screen>();
@@ -42,6 +42,7 @@ class ScreenManager {
       screens.get(currentScreenIndex).render();
     }
   }
+  
   
   Screen getActiveScreen() {
     if (currentScreenIndex >= 0 && currentScreenIndex < screens.size()) {

@@ -5,9 +5,6 @@
 
 #include <Arduino.h>
 
-// ================== CONFIG BÁSICA ==================
-const uint8_t UNUSED_PIN = 255;  // marcador de pin no usado (anulado)
-
 // ---------- Mapeo de sensores ----------
 enum {
   TM1 = 0, TM2 = 1,          // Transmetro (paradas)
@@ -17,8 +14,9 @@ enum {
 };
 
 const uint8_t N_SENSORS = 14;
+const uint8_t UNUSED_PIN = 255; // marca de pin anulado
 
-// Pines TRIG/ECHO (TV3 movido a 34/35; TU5 anulado)
+// Pines TRIG/ECHO
 struct UPin { uint8_t trig, echo; };
 const UPin US_PINS[N_SENSORS] = {
   {22,23},   // TM1
@@ -28,10 +26,10 @@ const UPin US_PINS[N_SENSORS] = {
   {30,31},   // TU3
   {32,33},   // TU4
   {UNUSED_PIN, UNUSED_PIN}, // TU5 (ANULADO)
-  {36,37},   // TU6
-  {38,39},   // TU7
+  {UNUSED_PIN, UNUSED_PIN}, // TU6 (ANULADO)
+  {UNUSED_PIN, UNUSED_PIN}, // TU7 (ANULADO)
   {46,47},   // TV2
-  {34,35},   // TV3  <-- ahora en 34/35
+  {34,35},   // TV3
   {50,51},   // TV4
   {52,53},   // TV5
   {6,7}      // TV7
@@ -70,11 +68,11 @@ bool     tu_leg_active = false;
 int8_t   tu_pos_active = -1;
 
 // =====================================================
-// CORREDOR (3 / 32.5 / 61 cm) — define ANTES de funciones
+// CORREDOR (3 / 32.5 / 61 cm)
 // =====================================================
 const uint8_t  NUM_ZONES = 3;
-const float    ZONE_CENTER[NUM_ZONES] = {3.0f, 32.5f, 61.0f}; // centro 32.5 → cubre 30..35 con half=2.5
-const float    ZONE_HALF_WIDTH = 2.5f; // ±2.5 cm (30..35 cm en la zona central)
+const float    ZONE_CENTER[NUM_ZONES] = {3.0f, 32.5f, 61.0f}; // 30..35 con half=2.5
+const float    ZONE_HALF_WIDTH = 2.5f;
 const uint32_t ZONE_STABLE_MS  = 150UL;
 
 struct CorridorState {
@@ -83,11 +81,84 @@ struct CorridorState {
   bool     zoneReported[NUM_ZONES]; // evita repetir hasta salir
 };
 
-// Estados de corredores (A en rojo)
 CorridorState cor_TM1 = {-1, 0, {0,0,0}};
 CorridorState cor_TV3 = {-1, 0, {0,0,0}};
 CorridorState cor_TU1 = {-1, 0, {0,0,0}};
 CorridorState cor_TU2 = {-1, 0, {0,0,0}};  // TU2 igual que TV3/TU1
+
+// =====================================================
+// BUZZERS (no bloqueantes) — en 36 y 37
+// =====================================================
+const uint8_t BUZ_TU1_PIN = 36;   // buzzer cercano a TU1
+const uint8_t BUZ_TU2_PIN = 37;   // buzzer cercano a TU2
+const uint16_t BUZZ_MS    = 500;  // duración del beep
+
+uint32_t buz1Until = 0;
+uint32_t buz2Until = 0;
+
+inline void buzzTU1() { digitalWrite(BUZ_TU1_PIN, HIGH); buz1Until = millis() + BUZZ_MS; }
+inline void buzzTU2() { digitalWrite(BUZ_TU2_PIN, HIGH); buz2Until = millis() + BUZZ_MS; }
+
+void updateBuzzers(){
+  uint32_t now = millis();
+  if (buz1Until && now >= buz1Until){ digitalWrite(BUZ_TU1_PIN, LOW); buz1Until = 0; }
+  if (buz2Until && now >= buz2Until){ digitalWrite(BUZ_TU2_PIN, LOW); buz2Until = 0; }
+}
+
+void buzzForZoneHuman(int zoneHuman){
+  // 3 o 32 cm -> TU1 ; 61 cm -> TU2
+  if (zoneHuman == 61) buzzTU2();
+  else                 buzzTU1();
+}
+
+// =====================================================
+// Botones manuales (4 patas) para activar buzzers
+// =====================================================
+const uint8_t BTN_BUZ1_PIN = 38;   // Botón que activa buzzer en pin 36 (TU1)
+const uint8_t BTN_BUZ2_PIN = 39;   // Botón que activa buzzer en pin 37 (TU2)
+const uint16_t BTN_DEBOUNCE_MS = 150;
+
+bool btn1Last = HIGH, btn2Last = HIGH;  // con INPUT_PULLUP: reposo HIGH
+uint32_t btn1ChangeMs = 0, btn2ChangeMs = 0;
+
+inline void readButtonsAndTrigger(){
+  uint32_t now = millis();
+
+  // --- Botón 1 ---
+  bool b1 = digitalRead(BTN_BUZ1_PIN);
+  if (b1 != btn1Last){
+    btn1Last = b1;
+    btn1ChangeMs = now;
+  } else {
+    if (b1 == LOW && (now - btn1ChangeMs) >= BTN_DEBOUNCE_MS){
+      // evento de "press" (mantener pulsado no repite gracias al apagado por tiempo)
+      buzzTU1();
+      // prevención de múltiples beeps por mantener: simula "consumido"
+      btn1ChangeMs = now + 1000; // margen para no re-disparar mientras está LOW
+    }
+  }
+
+  // --- Botón 2 ---
+  bool b2 = digitalRead(BTN_BUZ2_PIN);
+  if (b2 != btn2Last){
+    btn2Last = b2;
+    btn2ChangeMs = now;
+  } else {
+    if (b2 == LOW && (now - btn2ChangeMs) >= BTN_DEBOUNCE_MS){
+      buzzTU2();
+      btn2ChangeMs = now + 1000;
+    }
+  }
+}
+
+// =====================================================
+// *** NUEVO ***  Buzzers 3 y 4 SOLO por botón
+// =====================================================
+const uint8_t BUZ3_PIN    = 2;    // NUEVO buzzer 3
+const uint8_t BUZ4_PIN    = 3;    // NUEVO buzzer 4
+const uint8_t BTN_BUZ3_PIN = 4;   // NUEVO botón para buzzer 3
+const uint8_t BTN_BUZ4_PIN = 5;   // NUEVO botón para buzzer 4
+// Estos dos NO usan temporizador: se encienden SOLO mientras se presiona el botón.
 
 // =====================================================
 // Utilidades
@@ -108,7 +179,7 @@ float readUltrasonicCm(uint8_t id) {
 }
 
 inline float thrFor(uint8_t id){
-  if (id==TM1 || id==TM2 || id==TU1 || id==TU6) return THR_STOP_CM;
+  if (id==TM1 || id==TM2 || id==TU1) return THR_STOP_CM; // TU6 ya no existe
   return THR_ROUTE_CM;
 }
 
@@ -145,32 +216,19 @@ void TM_onLeave(uint8_t stopId){
 // =====================================================
 void TU_onArrive(uint8_t sensorId){
   Serial.print("TU,ARRIVE,");
-  if      (sensorId==TU6) Serial.println(6);       // mantenemos TU6
-  else                    Serial.println((int)sensorId);
+  Serial.println((int)sensorId);
 }
-void TU_onLeave(uint8_t sensorId){
-  if (sensorId==TU6){
-    tu_depart_ms = millis();
-    tu_planned_cm = TU_RETURN_6_TO_1;
-    tu_leg_active = true;
-    Serial.println("TU,LEAVE,6");
-    publishETA_TU_from(6, tu_planned_cm, 1);
-  }
-}
+void TU_onLeave(uint8_t /*sensorId*/){ /* sin uso (TU6 anulado) */ }
 
 // POS solo para intermedios que NO son de corredor (NO TV3, NO TU1, NO TU2)
 void TU_onHoldAt(uint8_t sensorId){
-  if (sensorId==TU3 || sensorId==TU4 || sensorId==TU5 || sensorId==TU7 ||
+  if (sensorId==TU3 || sensorId==TU4 ||
       sensorId==TV2 || sensorId==TV4 || sensorId==TV5 || sensorId==TV7) {
     tu_pos_active = sensorId;
     Serial.print("TU,POS,");
     Serial.println(sensorId==TV2 ? 2 :
                    sensorId==TU3 ? 3 :
-                   sensorId==TU4||sensorId==TV4 ? 4 :
-                   sensorId==TU5||sensorId==TV5 ? 5 : 7);
-  }
-  else if (sensorId==TU6) {
-    TU_onArrive(TU6);
+                   sensorId==TU4||sensorId==TV4 ? 4 : 7);
   }
 }
 
@@ -224,17 +282,17 @@ void updateTrafficLights(){
 #define SEM_NONE 2
 
 // TM1, TU1, TU2 y TV3 en NONE → los maneja el corredor.
-// TV2 lo dejo en B (según tu mapeo).
+// Sensores anulados (TU5, TU6, TU7) en NONE para ignorarlos.
 uint8_t semGroup[N_SENSORS] = {
   SEM_NONE, // TM1
   SEM_B,    // TM2
   SEM_NONE, // TU1  (corredor)
   SEM_NONE, // TU2  (corredor)
-  SEM_NONE, // TU3  (si quieres volver a genérico, cámbialo)
-  SEM_NONE, // TU4  (ídem)
-  SEM_B,    // TU5  (anulado, no afectará)
-  SEM_B,    // TU6
-  SEM_B,    // TU7
+  SEM_B,    // TU3
+  SEM_B,    // TU4
+  SEM_NONE, // TU5 (anulado)
+  SEM_NONE, // TU6 (anulado)
+  SEM_NONE, // TU7 (anulado)
   SEM_B,    // TV2
   SEM_NONE, // TV3  (corredor)
   SEM_B,    // TV4
@@ -259,7 +317,7 @@ bool isGroupRed_(uint8_t g){
 bool prevBelowSnap_violation[N_SENSORS] = {0};
 void checkRedLightViolation(){
   for (uint8_t id=0; id<N_SENSORS; id++){
-    if (semGroup[id] == SEM_NONE) continue; // TM1, TU1, TU2, TV3 excluidos
+    if (semGroup[id] == SEM_NONE) continue;
     bool nowBelow  = wasBelow[id];
     bool prevBelow = prevBelowSnap_violation[id];
     if (!prevBelow && nowBelow){
@@ -305,6 +363,7 @@ static void handleCorridorA(uint8_t sensorId, CorridorState &st, const char* lab
         Serial.print("Alerta infraccion de transito, ");
         Serial.print(label);
         Serial.print(", ZONA="); Serial.println(human);
+        buzzForZoneHuman(human);        // activar buzzer cercano
         st.zoneReported[st.zoneActive] = true;
       }
     }
@@ -328,28 +387,52 @@ static void checkCorridorsA(){
 void setup() {
   Serial.begin(115200);
   for (int i=0;i<N_SENSORS;i++){
-    if (US_PINS[i].trig == UNUSED_PIN || US_PINS[i].echo == UNUSED_PIN) continue; // saltar TU5
+    if (US_PINS[i].trig == UNUSED_PIN || US_PINS[i].echo == UNUSED_PIN) continue; // saltar anulados
     pinMode(US_PINS[i].trig, OUTPUT); digitalWrite(US_PINS[i].trig, LOW);
     pinMode(US_PINS[i].echo, INPUT);
   }
-  // Distancias para ETA (solo para intermedios que participan)
+
+  // Distancias para ETA (solo intermedios vigentes)
   TU_DIST_TO_6[TU3] = 113;
   TU_DIST_TO_6[TU4] = 159;
-  TU_DIST_TO_6[TU5] = 131;  // no se usa, pero no molesta
-  TU_DIST_TO_6[TU7] = 180;
   TU_DIST_TO_6[TV2] = 141;
   TU_DIST_TO_6[TV4] = 159;
   TU_DIST_TO_6[TV5] = 131;
   TU_DIST_TO_6[TV7] = 180;
 
+  // Semáforos
   pinMode(A_R, OUTPUT); pinMode(A_Y, OUTPUT); pinMode(A_G, OUTPUT);
   pinMode(B_R, OUTPUT); pinMode(B_Y, OUTPUT); pinMode(B_G, OUTPUT);
+
+  // Buzzers (36 y 37)
+  pinMode(BUZ_TU1_PIN, OUTPUT); digitalWrite(BUZ_TU1_PIN, LOW);
+  pinMode(BUZ_TU2_PIN, OUTPUT); digitalWrite(BUZ_TU2_PIN, LOW);
+
+  // *** NUEVO *** Buzzers 3 y 4
+  pinMode(BUZ3_PIN, OUTPUT); digitalWrite(BUZ3_PIN, LOW);
+  pinMode(BUZ4_PIN, OUTPUT); digitalWrite(BUZ4_PIN, LOW);
+
+  // Botones (INPUT_PULLUP)
+  pinMode(BTN_BUZ1_PIN, INPUT_PULLUP);
+  pinMode(BTN_BUZ2_PIN, INPUT_PULLUP);
+
+  // *** NUEVO *** Botones para buzzer 3 y 4
+  pinMode(BTN_BUZ3_PIN, INPUT_PULLUP);
+  pinMode(BTN_BUZ4_PIN, INPUT_PULLUP);
+
   phaseSince = millis();
   applyLights();
 }
 
 void loop() {
-  // Lecturas y eventos
+  // --- Botones manuales para buzzers existentes (36/37 con temporizador) ---
+  readButtonsAndTrigger();
+
+  // --- *** NUEVO *** Buzzer 3 y 4: sólo mientras el botón está presionado ---
+  digitalWrite(BUZ3_PIN, digitalRead(BTN_BUZ3_PIN) == LOW ? HIGH : LOW);
+  digitalWrite(BUZ4_PIN, digitalRead(BTN_BUZ4_PIN) == LOW ? HIGH : LOW);
+
+  // --- Lecturas y eventos de sensores ---
   for (uint8_t id=0; id<N_SENSORS; id++){
     float cm = readUltrasonicCm(id);
     lastCm[id] = cm;
@@ -378,29 +461,28 @@ void loop() {
       stableReported[id] = false;
 
       if (id==TM1 || id==TM2) TM_onLeave(id);
-      else if (id==TU6)       TU_onLeave(id);
 
-      // ETA solo para intermedios que sí participan (NO TU1, NO TU2, NO TV3)
-      if ((id==TU3 || id==TU4 || id==TU5 || id==TU7 ||
+      // ETA solo para intermedios vigentes (NO TU1, NO TU2, NO TV3, NO anulados)
+      if ((id==TU3 || id==TU4 ||
            id==TV2 || id==TV4 || id==TV5 || id==TV7) && tu_pos_active==id){
         uint16_t D = TU_DIST_TO_6[id];
         if (D>0){
           uint8_t fromNum =
             (id==TV2)?2 :
             (id==TU3)?3 :
-            (id==TU4||id==TV4)?4 :
-            (id==TU5||id==TV5)?5 : 7;
-          publishETA_TU_from(fromNum, D, 6);
+            (id==TU4||id==TV4)?4 : 7;
+          publishETA_TU_from(fromNum, D, 6); // el “6” es simbólico (meta)
         }
         tu_pos_active = -1;
       }
     }
   }
 
-  // Semáforos e infracciones
+  // Semáforos, buzzers e infracciones
   updateTrafficLights();
-  checkRedLightViolation(); // genérico (TM1/TU1/TU2/TV3 excluidos)
+  checkRedLightViolation(); // genérico (excluye corredores y anulados)
   checkCorridorsA();        // corredor: TM1, TV3, TU1 y TU2
+  updateBuzzers();          // apaga buzzers 36/37 al terminar su tiempo
 
   delay(60);
 }

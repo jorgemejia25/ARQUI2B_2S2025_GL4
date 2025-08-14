@@ -55,6 +55,15 @@ class SemaforosScreen extends Screen {
   void renderContent() {
     // Obtener datos actuales
     JSONObject semaforosData = dataProvider.getSemaforoData();
+    JSONObject infraccionesSemData = null;
+    try {
+      JSONObject all = dataProvider.getCurrentData();
+      if (all != null && all.hasKey("infracciones_semaforos")) {
+        infraccionesSemData = all.getJSONObject("infracciones_semaforos");
+      }
+    } catch(Exception e) {
+      // ignorar, se mantiene null
+    }
     stats = dataProvider.getStats();
     
     // Título
@@ -70,6 +79,12 @@ class SemaforosScreen extends Screen {
     for (SemaforoVisual semaforo : semaforosVisuales) {
       String estado = semaforosData.getString(semaforo.id);
       semaforo.actualizarEstado(estado);
+      if (infraccionesSemData != null && infraccionesSemData.hasKey(semaforo.id)) {
+        boolean inf = infraccionesSemData.getInt(semaforo.id) == 1;
+        semaforo.actualizarInfraccion(inf);
+      } else {
+        semaforo.actualizarInfraccion(false);
+      }
       semaforo.render();
     }
     

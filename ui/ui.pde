@@ -1,5 +1,6 @@
 // Sistema Inteligente de Seguridad y Gestión de Tráfico Urbano
 // Layout base modular - Arquitectura por componentes
+import processing.serial.*;
 
 // Componentes de layout
 TopBar topBar;
@@ -13,11 +14,17 @@ ScreenManager screenManager;
 // Overlay de bienvenida (nativo Processing)
 boolean showWelcome = true;
 
+// Serial
+Serial serialPort;
+int serialBaud = 115200;
+boolean serialConnected = false;
+
 void setup() {
   size(1200, 800);
   
   // Inicializar sistema de datos
   dataProvider = new DataProvider();
+  initSerial();
   
   // Crear componentes de layout
   createLayout();
@@ -68,6 +75,7 @@ void createLayout() {
 
 void draw() {
   background(Theme.LIGHT_GRAY);
+  readSerial();
   
   // Renderizar layout base
   topBar.render();
@@ -146,6 +154,11 @@ void keyPressed() {
     println("Pantalla activa: " + screenManager.getCurrentScreenName());
     println("Índice de pantalla: " + screenManager.getCurrentScreenIndex());
     println("Total de pantallas: " + screenManager.getScreenCount());
+    println("Serial conectado: " + serialConnected);
+    println("Serial modo activo: " + dataProvider.isSerialMode());
+    println("Proveedor - última fuente: " + dataProvider.getLastSource());
+    println("Proveedor - total actualizaciones: " + dataProvider.getUpdateCount());
+    println("Proveedor - último ts: " + dataProvider.getLastTimestamp());
     println("========================\n");
   }
   
@@ -153,5 +166,64 @@ void keyPressed() {
   if (key >= '1' && key <= '4') {
     int screenIndex = key - '1';
     screenManager.setActiveScreen(screenIndex);
+  }
+}
+
+// --- Serial ---
+void initSerial() {
+  try {
+    String[] ports = Serial.list();
+    if (ports == null || ports.length == 0) {
+      println("[Serial] No se encontraron puertos. Modo simulado activo.");
+      dataProvider.setSerialMode(false);
+      return;
+    }
+
+    // Heurística: priorizar puertos típicos de Arduino en macOS y Linux
+    String chosen = null;
+    for (String p : ports) {
+      String lp = p.toLowerCase();
+      if (lp.contains("usbmodem") || lp.contains("usbserial") || lp.contains("ttyacm") || lp.contains("ttyusb")) {
+        chosen = p;
+        break;
+      }
+    }
+    if (chosen == null) {
+      // Si no encontramos coincidencia, elegimos el último puerto disponible
+      chosen = ports[ports.length - 1];
+    }
+
+    println("[Serial] Abriendo puerto: " + chosen + " @ " + serialBaud + " baudios");
+    serialPort = new Serial(this, chosen, serialBaud);
+    serialPort.clear();
+    serialConnected = true;
+    dataProvider.setSerialMode(true);
+  } catch (Exception ex) {
+    println("[Serial] Error al inicializar: " + ex.getMessage());
+    serialConnected = false;
+    dataProvider.setSerialMode(false);
+  }
+}
+
+void readSerial() {
+  if (!serialConnected || serialPort == null) return;
+  try {
+    while (serialPort.available() > 0) {
+      String line = serialPort.readStringUntil('\n');
+      if (line == null) break;
+      line = line.trim();
+      if (line.length() == 0) continue;
+      // Solo procesar JSON (evitar logs que no son JSON)
+      if (!line.startsWith("{")) {
+        continue;
+      }
+      JSONObject json = parseJSONObject(line);
+      if (json != null) {
+        dataProvider.setExternalData(json);
+        println("[Serial] JSON aplicado. ts=" + dataProvider.getLastTimestamp() + ", updates=" + dataProvider.getUpdateCount());
+      }
+    }
+  } catch (Exception ex) {
+    println("[Serial] Error de lectura: " + ex.getMessage());
   }
 }

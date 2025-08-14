@@ -6,6 +6,14 @@ class DataProvider {
   private long lastUpdateTime;
   private int updateInterval = 2000; // Actualizar cada 2 segundos
   
+  // Cuando está activo, el proveedor no genera datos simulados y
+  // espera datos externos (por ejemplo, por Serial)
+  private boolean serialMode = false;
+  
+  // Metadatos de diagnóstico
+  private String lastSource = "simulado"; // "simulado" | "serial"
+  private int updateCount = 0;
+  
   // Estados posibles para semáforos
   private String[] semaforoStates = {"ROJO", "VERDE", "AMARILLO"};
   
@@ -25,10 +33,12 @@ class DataProvider {
   
   // Método principal para obtener datos actuales
   JSONObject getCurrentData() {
-    // Verificar si necesita actualización
-    if (millis() - lastUpdateTime > updateInterval) {
-      generateNewData();
-      lastUpdateTime = millis();
+    // En modo serial, no generamos datos simulados automáticamente
+    if (!serialMode) {
+      if (millis() - lastUpdateTime > updateInterval) {
+        generateNewData();
+        lastUpdateTime = millis();
+      }
     }
     
     return currentData;
@@ -81,6 +91,8 @@ class DataProvider {
       }
     }
     currentData.setJSONArray("infracciones", infracciones);
+    lastSource = "simulado";
+    updateCount++;
   }
   
   // Obtener datos formateados como String (para mostrar o enviar por serial)
@@ -186,10 +198,45 @@ class DataProvider {
     this.updateInterval = intervalMs;
   }
   
+  // Habilitar/deshabilitar modo serial (datos externos)
+  void setSerialMode(boolean enabled) {
+    this.serialMode = enabled;
+  }
+  
+  boolean isSerialMode() {
+    return serialMode;
+  }
+  
+  // Inyectar datos externos (por ejemplo, desde Arduino)
+  void setExternalData(JSONObject externalData) {
+    if (externalData == null) return;
+    this.currentData = externalData;
+    this.lastUpdateTime = millis();
+    this.lastSource = "serial";
+    updateCount++;
+  }
+  
   // Forzar actualización de datos
   void forceUpdate() {
-    generateNewData();
-    lastUpdateTime = millis();
+    if (!serialMode) {
+      generateNewData();
+      lastUpdateTime = millis();
+    }
+  }
+
+  // --- Diagnóstico ---
+  String getLastSource() {
+    return lastSource;
+  }
+
+  int getUpdateCount() {
+    return updateCount;
+  }
+
+  String getLastTimestamp() {
+    if (currentData == null) return "";
+    if (currentData.hasKey("ts")) return currentData.getString("ts");
+    return "";
   }
   
   // Obtener estadísticas rápidas

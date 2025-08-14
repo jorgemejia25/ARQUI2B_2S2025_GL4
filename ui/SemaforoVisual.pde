@@ -4,6 +4,7 @@ class SemaforoVisual {
   String estado;
   float width = 70;    // Tamaño reducido para que quepan todos
   float height = 100;  // Alto reducido para mejor ajuste
+  boolean infraccion = false;
   
   // Colores para cada luz
   color colorRojo, colorAmarillo, colorVerde;
@@ -19,6 +20,10 @@ class SemaforoVisual {
   void actualizarEstado(String nuevoEstado) {
     this.estado = nuevoEstado;
     actualizarColores();
+  }
+  
+  void actualizarInfraccion(boolean hayInfraccion) {
+    this.infraccion = hayInfraccion;
   }
   
   void actualizarColores() {
@@ -61,6 +66,17 @@ class SemaforoVisual {
     stroke(20);
     strokeWeight(3);
     rect(x, y, width, height, 12);
+    
+    // Indicador de infracción: borde exterior resaltado
+    if (infraccion) {
+      noFill();
+      stroke(Theme.DANGER_COLOR);
+      strokeWeight(4);
+      rect(x - 4, y - 4, width + 8, height + 8, 14);
+    }
+
+    // Badge de estado (icono): arriba a la derecha del marco
+    drawInfractionBadge();
     
     // Marco interno
     fill(60, 60, 65);
@@ -115,6 +131,16 @@ class SemaforoVisual {
     textSize(Theme.SMALL_SIZE);
     text(estado, centerX, y + height + 40);
     
+    // Etiqueta de estado por infracción bajo el estado del semáforo
+    textSize(Theme.TINY_SIZE);
+    if (infraccion) {
+      fill(Theme.DANGER_COLOR);
+      text("Infracción", centerX, y + height + 56);
+    } else {
+      fill(Theme.SUCCESS_COLOR);
+      text("OK", centerX, y + height + 56);
+    }
+    
     // Efecto de brillo en luz activa - mejorado
     if (estado.equals("ROJO")) {
       drawGlow(centerX, y + lightSpacing, lightRadius, Theme.DANGER_COLOR);
@@ -122,6 +148,39 @@ class SemaforoVisual {
       drawGlow(centerX, y + 2 * lightSpacing, lightRadius, Theme.WARNING_COLOR);
     } else if (estado.equals("VERDE")) {
       drawGlow(centerX, y + 3 * lightSpacing, lightRadius, Theme.SUCCESS_COLOR);
+    }
+  }
+
+  void drawInfractionBadge() {
+    float badgeSize = 18;
+    float bx = x + width - badgeSize/2;
+    float by = y - badgeSize/2;
+    if (infraccion) {
+      // Triángulo de alerta con signo de exclamación
+      noStroke();
+      fill(Theme.DANGER_COLOR);
+      float h = badgeSize;
+      float half = badgeSize / 2.0;
+      triangle(bx - half, by + half, bx + half, by + half, bx, by - half);
+      // Exclamación
+      fill(255);
+      rectMode(CENTER);
+      rect(bx, by + 1, 3, h * 0.45);
+      rect(bx, by + half * 0.6, 3, 3);
+      rectMode(CORNER);
+    } else {
+      // Círculo verde con check
+      noStroke();
+      fill(Theme.SUCCESS_COLOR);
+      circle(bx, by, badgeSize);
+      // Check con líneas blancas
+      stroke(255);
+      strokeWeight(2);
+      float cx = bx - badgeSize * 0.18;
+      float cy = by + badgeSize * 0.05;
+      line(cx - 3, cy, cx, cy + 4);
+      line(cx, cy + 4, cx + 6, cy - 4);
+      noStroke();
     }
   }
     void drawGlow(float centerX, float centerY, float radius, color glowColor) {

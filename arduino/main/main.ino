@@ -411,6 +411,66 @@ void updateTrafficLights()
 // ---------------------------------
 // Emite una línea JSON para la UI
 // ---------------------------------
+// (Colocamos antes las definiciones de grupos de semáforos y utilidades que usa emitUIJson)
+#define SEM_A 0
+#define SEM_B 1
+#define SEM_NONE 2
+
+// TM1, TU1, TU2 y TV3 en NONE → corredor; sensores anulados en NONE
+uint8_t semGroup[N_SENSORS] = {
+    SEM_NONE, // TM1
+    SEM_B,    // TM2
+    SEM_NONE, // TU1
+    SEM_NONE, // TU2
+    SEM_B,    // TU3
+    SEM_B,    // TU4
+    SEM_NONE, // TU5
+    SEM_NONE, // TU6
+    SEM_NONE, // TU7
+    SEM_B,    // TV2
+    SEM_NONE, // TV3
+    SEM_B,    // TV4
+    SEM_B,    // TV5
+    SEM_B     // TV7
+};
+
+bool isGroupRed_(uint8_t g) {
+    if (g == SEM_A) return (phase == P_B_GREEN || phase == P_B_YELLOW);
+    if (g == SEM_B) return (phase == P_A_GREEN || phase == P_A_YELLOW);
+    return false;
+}
+
+// Nombre textual de sensor para logs de infracción
+const char *nameOf(uint8_t id) {
+    switch (id) {
+        case TM1: return "TM1"; case TM2: return "TM2";
+        case TU1: return "TU1"; case TU2: return "TU2"; case TU3: return "TU3"; case TU4: return "TU4";
+        case TU5: return "TU5"; case TU6: return "TU6"; case TU7: return "TU7";
+        case TV2: return "TV2"; case TV3: return "TV3"; case TV4: return "TV4"; case TV5: return "TV5"; case TV7: return "TV7";
+        default: return "?";
+    }
+}
+
+// Snapshot previo para detectar flanco de bajada en violaciones
+bool prevBelowSnap_violation[N_SENSORS] = {0};
+
+// Infracción genérica (sensores asociados a grupo A/B que cruzan en rojo)
+void checkRedLightViolation() {
+    for (uint8_t id = 0; id < N_SENSORS; id++) {
+        if (semGroup[id] == SEM_NONE) continue; // ignorar sensores no asociados
+        bool nowBelow = wasBelow[id];
+        bool prevBelow = prevBelowSnap_violation[id];
+        // flanco de descenso (entra debajo del umbral)
+        if (!prevBelow && nowBelow) {
+            if (isGroupRed_(semGroup[id])) {
+                Serial.print("Alerta infraccion de transito, SENSOR=");
+                Serial.println(nameOf(id));
+            }
+        }
+        prevBelowSnap_violation[id] = nowBelow;
+    }
+}
+
 inline const char *stateForGroupA()
 {
     switch (phase)
@@ -575,96 +635,7 @@ void emitUIJson()
     Serial.println('}');
 }
 
-// =====================================================
-// INFRACCIÓN EN ROJO (genérico)
-// =====================================================
-#define SEM_A 0
-#define SEM_B 1
-#define SEM_NONE 2
-
-// TM1, TU1, TU2 y TV3 en NONE → los maneja el corredor.
-// Sensores anulados (TU5, TU6, TU7) en NONE para ignorarlos.
-uint8_t semGroup[N_SENSORS] = {
-    SEM_NONE, // TM1
-    SEM_B,    // TM2
-    SEM_NONE, // TU1  (corredor)
-    SEM_NONE, // TU2  (corredor)
-    SEM_B,    // TU3
-    SEM_B,    // TU4
-    SEM_NONE, // TU5 (anulado)
-    SEM_NONE, // TU6 (anulado)
-    SEM_NONE, // TU7 (anulado)
-    SEM_B,    // TV2
-    SEM_NONE, // TV3  (corredor)
-    SEM_B,    // TV4
-    SEM_B,    // TV5
-    SEM_B     // TV7
-};
-
-const char *nameOf(uint8_t id)
-{
-    switch (id)
-    {
-    case TM1:
-        return "TM1";
-    case TM2:
-        return "TM2";
-    case TU1:
-        return "TU1";
-    case TU2:
-        return "TU2";
-    case TU3:
-        return "TU3";
-    case TU4:
-        return "TU4";
-    case TU5:
-        return "TU5";
-    case TU6:
-        return "TU6";
-    case TU7:
-        return "TU7";
-    case TV2:
-        return "TV2";
-    case TV3:
-        return "TV3";
-    case TV4:
-        return "TV4";
-    case TV5:
-        return "TV5";
-    case TV7:
-        return "TV7";
-    default:
-        return "?";
-    }
-}
-bool isGroupRed_(uint8_t g)
-{
-    if (g == SEM_A)
-        return (phase == P_B_GREEN || phase == P_B_YELLOW);
-    if (g == SEM_B)
-        return (phase == P_A_GREEN || phase == P_A_YELLOW);
-    return false;
-}
-bool prevBelowSnap_violation[N_SENSORS] = {0};
-void checkRedLightViolation()
-{
-    for (uint8_t id = 0; id < N_SENSORS; id++)
-    {
-        if (semGroup[id] == SEM_NONE)
-            continue;
-        bool nowBelow = wasBelow[id];
-        bool prevBelow = prevBelowSnap_violation[id];
-        if (!prevBelow && nowBelow)
-        {
-            if (isGroupRed_(semGroup[id]))
-            {
-                Serial.print("Alerta infraccion de transito, SENSOR=");
-                Serial.println(nameOf(id));
-            }
-        }
-        prevBelowSnap_violation[id] = nowBelow;
-    }
-}
+// (Se reutiliza checkRedLightViolation más abajo; si dependía de nameOf, restaurar nameOf donde se requiera)
 
 // =====================================================
 // Lógica del CORREDOR (A en rojo): TM1, TV3, TU1, TU2

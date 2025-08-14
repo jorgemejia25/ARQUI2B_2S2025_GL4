@@ -1,5 +1,8 @@
+import java.util.HashMap;
+
 class SemaforosScreen extends Screen {
   private ArrayList<SemaforoVisual> semaforosVisuales;
+  private ArrayList<SemaforoVisual> semaforosAB; // A1..A3 (fila 1) y B1..B3 (fila 2)
   private TrafficStats stats;
   private DataProvider dataProvider;
   
@@ -11,6 +14,7 @@ class SemaforosScreen extends Screen {
   
   void inicializarSemaforos() {
     semaforosVisuales = new ArrayList<SemaforoVisual>();
+    semaforosAB = new ArrayList<SemaforoVisual>();
     
     // Layout mejorado: 5 columnas x 2 filas (horizontal)
     int cols = 5;  // 5 semáforos por fila
@@ -35,57 +39,81 @@ class SemaforosScreen extends Screen {
   // Nueva "fila" de separación por encima de la primera fila (espaciador superior)
   float topRowSpacer = 60; // píxeles extra para separar del título/estadísticas
     
-    // Crear semáforos de izquierda a derecha, arriba hacia abajo
-    for (int i = 0; i < 10; i++) {
-      int row = i / cols;  // Fila (0 o 1)
-      int col = i % cols;  // Columna (0 a 4)
-      
-  // Posición centrada de cada semáforo (ajustado para tamaño menor)
-  float semaforoX = x + paddingX + (col * spacingX) + (spacingX / 2) - 35; // -35 para centrar (tamaño 70)
-  // Ajuste Y: fila 1 (segunda fila) recibe un pequeño offset adicional
-  float rowOffset = (row == 1) ? extraRowGap : 0;
-  float semaforoY = y + paddingY + topRowSpacer + 20 + (row * spacingY) + (spacingY / 2) - 50 + rowOffset; // -50 para centrar (tamaño 100)
-      
-      String semaforoId = "S" + (i + 1);
-      semaforosVisuales.add(new SemaforoVisual(semaforoX, semaforoY, semaforoId));
+    // (legacy S1..S10 omitido)
+
+    // NUEVO: grilla 2x3: fila 1 = A1..A3, fila 2 = B1..B3; columnas = calles (1..3)
+    int colsAB = 3;
+    int rowsAB = 2;
+    float gridPaddingX = 60; // más ancho para separar columnas
+    float gridTop = y + 140;  // pegado al panel de estadísticas
+    float gridWidth = width - (2 * gridPaddingX);
+    float gridSpacingX = gridWidth / colsAB;
+    float cellW = 70;
+    float cellH = 100;
+    float rowGap = 60; // mayor separación vertical entre filas
+    for (int row = 0; row < rowsAB; row++) {
+      for (int col = 0; col < colsAB; col++) {
+        float gx = x + gridPaddingX + (col * gridSpacingX) + (gridSpacingX / 2) - (cellW/2);
+        float gy = gridTop + row * (cellH + rowGap);
+        String id = (row == 0 ? "A" : "B") + str(col + 1);
+        semaforosAB.add(new SemaforoVisual(gx, gy, id));
+      }
     }
   }
   
   @Override
   void renderContent() {
-    // Obtener datos actuales
-    JSONObject semaforosData = dataProvider.getSemaforoData();
-    JSONObject infraccionesSemData = null;
-    try {
-      JSONObject all = dataProvider.getCurrentData();
-      if (all != null && all.hasKey("infracciones_semaforos")) {
-        infraccionesSemData = all.getJSONObject("infracciones_semaforos");
-      }
-    } catch(Exception e) {
-      // ignorar, se mantiene null
-    }
+    // Obtener datos actuales (para A/B y estadísticas)
+    JSONObject all = dataProvider.getCurrentData();
     stats = dataProvider.getStats();
     
-    // Título
-    fill(Theme.PRIMARY_COLOR);
-    textAlign(CENTER);
-    textSize(Theme.TITLE_SIZE);
-    text("Estado de Semáforos", x + width/2, y + 40);
-    
+    // (El título lo dibuja la clase base Screen)
+
     // Estadísticas en la parte superior
     renderEstadisticas();
     
-    // Actualizar y renderizar semáforos
-    for (SemaforoVisual semaforo : semaforosVisuales) {
-      String estado = semaforosData.getString(semaforo.id);
-      semaforo.actualizarEstado(estado);
-      if (infraccionesSemData != null && infraccionesSemData.hasKey(semaforo.id)) {
-        boolean inf = infraccionesSemData.getInt(semaforo.id) == 1;
-        semaforo.actualizarInfraccion(inf);
-      } else {
-        semaforo.actualizarInfraccion(false);
+    // Render A/B por calles
+    JSONObject ab = null;
+    JSONArray det = null;
+    try {
+      if (all != null && all.hasKey("semaforosAB")) ab = all.getJSONObject("semaforosAB");
+      if (all != null && all.hasKey("infracciones_detalle")) det = all.getJSONArray("infracciones_detalle");
+    } catch(Exception e) {}
+
+    // Mapa de infracciones por id (A1..B3)
+    HashMap<String, Boolean> infMap = new HashMap<String, Boolean>();
+    if (det != null) {
+      for (int i = 0; i < det.size(); i++) {
+        try {
+          JSONObject d = det.getJSONObject(i);
+          String tipo = d.getString("tipo");
+          int calle = d.getInt("calle");
+          String key = tipo + calle;
+          infMap.put(key, true);
+        } catch(Exception ie) {}
       }
-      semaforo.render();
+    }
+
+    // Etiquetas de columnas
+    fill(Theme.TEXT_COLOR);
+    textAlign(CENTER);
+    textSize(Theme.SMALL_SIZE);
+    // Columnas
+    if (semaforosAB.size() >= 6) {
+      text("Calle 1", semaforosAB.get(0).x + 35, semaforosAB.get(0).y - 36);
+      text("Calle 2", semaforosAB.get(1).x + 35, semaforosAB.get(1).y - 36);
+      text("Calle 3", semaforosAB.get(2).x + 35, semaforosAB.get(2).y - 36);
+    }
+
+    for (SemaforoVisual s : semaforosAB) {
+      String estado = "ROJO";
+      if (ab != null && ab.hasKey(s.id)) {
+        estado = ab.getString(s.id);
+      }
+      s.actualizarEstado(estado);
+      boolean hasInf = infMap.containsKey(s.id);
+      s.actualizarInfraccion(hasInf);
+      s.render();
     }
     
     // Leyenda en la parte inferior
@@ -114,17 +142,17 @@ class SemaforosScreen extends Screen {
     
     // Rojos
     fill(Theme.DANGER_COLOR);
-    text("🔴 " + stats.semaforosRojos + " Rojos", textX, textY);
+    text("Rojos: " + stats.semaforosRojos, textX, textY);
     
     // Verdes
     textX += 120;
     fill(Theme.SUCCESS_COLOR);
-    text("🟢 " + stats.semaforosVerdes + " Verdes", textX, textY);
+    text("Verdes: " + stats.semaforosVerdes, textX, textY);
     
     // Amarillos
     textX += 120;
     fill(Theme.WARNING_COLOR);
-    text("🟡 " + stats.semaforosAmarillos + " Amarillos", textX, textY);
+    text("Amarillos: " + stats.semaforosAmarillos, textX, textY);
     
     // Total
     textX += 140;
@@ -172,10 +200,9 @@ class SemaforosScreen extends Screen {
 
   // Manejo de clics sobre los semáforos
   void handleMousePressed(int mx, int my) {
-    if (semaforosVisuales == null) return;
-    for (SemaforoVisual semaforo : semaforosVisuales) {
+    if (semaforosAB == null) return;
+    for (SemaforoVisual semaforo : semaforosAB) {
       if (semaforo.isClicked(mx, my)) {
-        // Por ahora solo informamos el clic; los estados vienen del DataProvider
         println("Click en " + semaforo.id + " (estado: " + semaforo.estado + ")");
         break;
       }

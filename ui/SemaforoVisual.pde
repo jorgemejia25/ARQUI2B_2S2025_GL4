@@ -48,13 +48,12 @@ class SemaforoVisual {
     void render() {
     float centerX = x + width/2;
     
-    // Etiqueta "Semáforo X" arriba del semáforo
+    // Etiqueta compacta arriba (id)
     fill(Theme.TEXT_COLOR);
     noStroke();
     textAlign(CENTER);
-    textSize(Theme.SMALL_SIZE);
-    String numeroSemaforo = id.substring(1); // Extrae el número del ID (ej: "S1" -> "1")
-    text("Semáforo " + numeroSemaforo, centerX, y - 15);
+    textSize(Theme.TINY_SIZE);
+    text(id, centerX, y - 10);
     
     // Sombra del semáforo
     fill(0, 30);
@@ -117,28 +116,20 @@ class SemaforoVisual {
     noFill();
     circle(centerX, y + 3 * lightSpacing, lightRadius + 2);
     
-    // ID del semáforo - mejor posicionamiento
-    fill(Theme.WHITE);
-    stroke(Theme.DARK_GRAY);
-    strokeWeight(1);
-    textAlign(CENTER);
-    textSize(Theme.NORMAL_SIZE);
-    text(id, centerX, y + height + 20);
-    
-    // Estado actual - más visible
+    // Estado actual compacto debajo
     fill(Theme.TEXT_COLOR);
     noStroke();
-    textSize(Theme.SMALL_SIZE);
-    text(estado, centerX, y + height + 40);
+    textSize(Theme.TINY_SIZE);
+    text(estado, centerX, y + height + 18);
     
     // Etiqueta de estado por infracción bajo el estado del semáforo
     textSize(Theme.TINY_SIZE);
     if (infraccion) {
       fill(Theme.DANGER_COLOR);
-      text("Infracción", centerX, y + height + 56);
+      text("Infracción", centerX, y + height + 32);
     } else {
       fill(Theme.SUCCESS_COLOR);
-      text("OK", centerX, y + height + 56);
+      text("OK", centerX, y + height + 32);
     }
     
     // Efecto de brillo en luz activa - mejorado

@@ -434,20 +434,50 @@ uint8_t semGroup[N_SENSORS] = {
     SEM_B     // TV7
 };
 
-bool isGroupRed_(uint8_t g) {
-    if (g == SEM_A) return (phase == P_B_GREEN || phase == P_B_YELLOW);
-    if (g == SEM_B) return (phase == P_A_GREEN || phase == P_A_YELLOW);
+bool isGroupRed_(uint8_t g)
+{
+    if (g == SEM_A)
+        return (phase == P_B_GREEN || phase == P_B_YELLOW);
+    if (g == SEM_B)
+        return (phase == P_A_GREEN || phase == P_A_YELLOW);
     return false;
 }
 
 // Nombre textual de sensor para logs de infracción
-const char *nameOf(uint8_t id) {
-    switch (id) {
-        case TM1: return "TM1"; case TM2: return "TM2";
-        case TU1: return "TU1"; case TU2: return "TU2"; case TU3: return "TU3"; case TU4: return "TU4";
-        case TU5: return "TU5"; case TU6: return "TU6"; case TU7: return "TU7";
-        case TV2: return "TV2"; case TV3: return "TV3"; case TV4: return "TV4"; case TV5: return "TV5"; case TV7: return "TV7";
-        default: return "?";
+const char *nameOf(uint8_t id)
+{
+    switch (id)
+    {
+    case TM1:
+        return "TM1";
+    case TM2:
+        return "TM2";
+    case TU1:
+        return "TU1";
+    case TU2:
+        return "TU2";
+    case TU3:
+        return "TU3";
+    case TU4:
+        return "TU4";
+    case TU5:
+        return "TU5";
+    case TU6:
+        return "TU6";
+    case TU7:
+        return "TU7";
+    case TV2:
+        return "TV2";
+    case TV3:
+        return "TV3";
+    case TV4:
+        return "TV4";
+    case TV5:
+        return "TV5";
+    case TV7:
+        return "TV7";
+    default:
+        return "?";
     }
 }
 
@@ -455,14 +485,19 @@ const char *nameOf(uint8_t id) {
 bool prevBelowSnap_violation[N_SENSORS] = {0};
 
 // Infracción genérica (sensores asociados a grupo A/B que cruzan en rojo)
-void checkRedLightViolation() {
-    for (uint8_t id = 0; id < N_SENSORS; id++) {
-        if (semGroup[id] == SEM_NONE) continue; // ignorar sensores no asociados
+void checkRedLightViolation()
+{
+    for (uint8_t id = 0; id < N_SENSORS; id++)
+    {
+        if (semGroup[id] == SEM_NONE)
+            continue; // ignorar sensores no asociados
         bool nowBelow = wasBelow[id];
         bool prevBelow = prevBelowSnap_violation[id];
         // flanco de descenso (entra debajo del umbral)
-        if (!prevBelow && nowBelow) {
-            if (isGroupRed_(semGroup[id])) {
+        if (!prevBelow && nowBelow)
+        {
+            if (isGroupRed_(semGroup[id]))
+            {
                 Serial.print("Alerta infraccion de transito, SENSOR=");
                 Serial.println(nameOf(id));
             }
@@ -513,6 +548,31 @@ void emitUIJson()
     Serial.print(millis());
     Serial.print("\",");
 
+    // Semáforos A/B por calle (A1..A3, B1..B3)
+    Serial.print("\"semaforosAB\":{");
+    for (int i = 1; i <= 3; i++)
+    {
+        Serial.print('\"');
+        Serial.print('A');
+        Serial.print(i);
+        Serial.print("\":\"");
+        Serial.print(a);
+        Serial.print('\"');
+        Serial.print(',');
+    }
+    for (int i = 1; i <= 3; i++)
+    {
+        Serial.print('\"');
+        Serial.print('B');
+        Serial.print(i);
+        Serial.print("\":\"");
+        Serial.print(b);
+        Serial.print('\"');
+        if (i < 3)
+            Serial.print(',');
+    }
+    Serial.print("},");
+
     // Semáforos S1..S10 (S1..S5 = grupo A, S6..S10 = grupo B)
     Serial.print("\"semaforos\":{");
     for (int i = 1; i <= 10; i++)
@@ -527,6 +587,57 @@ void emitUIJson()
             Serial.print(',');
     }
     Serial.print("},");
+
+    // Infracciones detalladas por calle y tipo (A/B) usando zonas 3/32/61
+    bool redA = isGroupRed_(SEM_A);
+    bool redB = isGroupRed_(SEM_B);
+    bool calleA[3] = {false, false, false};
+    bool calleB[3] = {false, false, false};
+    const uint8_t corridorSensors[] = {TM1, TV3, TU1, TU2};
+    const size_t corridorCount = sizeof(corridorSensors) / sizeof(corridorSensors[0]);
+    for (size_t i = 0; i < corridorCount; i++)
+    {
+        uint8_t sid = corridorSensors[i];
+        int8_t z = zoneForDistance(lastCm[sid]);
+        if (z >= 0 && z < 3)
+        {
+            if (redA)
+                calleA[z] = true;
+            if (redB)
+                calleB[z] = true;
+        }
+    }
+    Serial.print("\"infracciones_detalle\":[");
+    bool firstDet = true;
+    for (int zi = 0; zi < 3; zi++)
+    {
+        if (calleA[zi])
+        {
+            if (!firstDet)
+                Serial.print(',');
+            Serial.print('{');
+            Serial.print("\"tipo\":\"A\",");
+            Serial.print("\"calle\":");
+            Serial.print(zi == 0 ? 1 : (zi == 1 ? 2 : 3));
+            Serial.print('}');
+            firstDet = false;
+        }
+    }
+    for (int zi = 0; zi < 3; zi++)
+    {
+        if (calleB[zi])
+        {
+            if (!firstDet)
+                Serial.print(',');
+            Serial.print('{');
+            Serial.print("\"tipo\":\"B\",");
+            Serial.print("\"calle\":");
+            Serial.print(zi == 0 ? 1 : (zi == 1 ? 2 : 3));
+            Serial.print('}');
+            firstDet = false;
+        }
+    }
+    Serial.print("],");
 
     // Infracciones por semáforo (1 si hay presencia en grupo en rojo)
     bool groupAIsRed = isGroupRed_(SEM_A);

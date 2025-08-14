@@ -6,13 +6,15 @@ class DataProvider {
   private long lastUpdateTime;
   private int updateInterval = 2000; // Actualizar cada 2 segundos
   
-  // Cuando está activo, el proveedor no genera datos simulados y
-  // espera datos externos (por ejemplo, por Serial)
+  // Modos de operación
   private boolean serialMode = false;
+  private boolean simulationEnabled = true; // Nuevo: permite intercambiar entre simulado y real
   
   // Metadatos de diagnóstico
-  private String lastSource = "simulado"; // "simulado" | "serial"
+  private String lastSource = "simulado"; // "simulado" | "serial" | "desconectado"
   private int updateCount = 0;
+  private long serialTimeoutMs = 5000; // 5 segundos sin datos serial = modo simulado automático
+  private long lastSerialDataTime = 0;
   
   // Estados posibles para semáforos
   private String[] semaforoStates = {"ROJO", "VERDE", "AMARILLO"};
@@ -28,13 +30,16 @@ class DataProvider {
   
   DataProvider() {
     lastUpdateTime = millis();
+    lastSerialDataTime = millis();
     generateNewData();
   }
-  
   // Método principal para obtener datos actuales
   JSONObject getCurrentData() {
-    // En modo serial, no generamos datos simulados automáticamente
-    if (!serialMode) {
+    // Verificar timeout de datos serial
+    checkSerialTimeout();
+    
+    // Solo generar datos simulados si está habilitado y no hay datos reales recientes
+    if (simulationEnabled && (!serialMode || isSerialTimedOut())) {
       if (millis() - lastUpdateTime > updateInterval) {
         generateNewData();
         lastUpdateTime = millis();
@@ -44,6 +49,19 @@ class DataProvider {
     return currentData;
   }
   
+  // Verificar si hay timeout en datos serial
+  private void checkSerialTimeout() {
+    if (serialMode && isSerialTimedOut() && !simulationEnabled) {
+      println("[DataProvider] Timeout de datos serial. Cambiando a modo simulado automáticamente.");
+      simulationEnabled = true;
+      lastSource = "simulado_auto";
+    }
+  }
+  
+  private boolean isSerialTimedOut() {
+    return (millis() - lastSerialDataTime) > serialTimeoutMs;
+  }
+  
   // Generar nuevos datos simulados
   void generateNewData() {
     currentData = new JSONObject();
@@ -51,13 +69,23 @@ class DataProvider {
     // Timestamp actual
     currentData.setString("ts", getCurrentTimestamp());
     
-    // Generar estados de semáforos
+    // Generar estados de semáforos (legacy S1..S10)
     JSONObject semaforos = new JSONObject();
     for (String semaforoId : semaforoIds) {
       String estado = semaforoStates[int(random(3))];
       semaforos.setString(semaforoId, estado);
     }
     currentData.setJSONObject("semaforos", semaforos);
+
+    // NUEVO: Generar estados de semáforos por tipo y calle (A1..A3, B1..B3)
+    JSONObject semaforosAB = new JSONObject();
+    for (int i = 1; i <= 3; i++) {
+      semaforosAB.setString("A" + i, semaforoStates[int(random(3))]);
+    }
+    for (int i = 1; i <= 3; i++) {
+      semaforosAB.setString("B" + i, semaforoStates[int(random(3))]);
+    }
+    currentData.setJSONObject("semaforosAB", semaforosAB);
     
     // Generar distancias en paradas (en cm)
     JSONObject distancias = new JSONObject();
@@ -83,7 +111,7 @@ class DataProvider {
     }
     currentData.setJSONObject("panico", panico);
     
-    // Generar infracciones (lista de paradas con infracciones)
+    // Generar infracciones (lista de paradas con infracciones) - legacy
     JSONArray infracciones = new JSONArray();
     for (String paradaId : paradaIds) {
       if (random(1) > 0.7) { // 30% probabilidad de infracción
@@ -91,7 +119,22 @@ class DataProvider {
       }
     }
     currentData.setJSONArray("infracciones", infracciones);
-    lastSource = "simulado";
+
+    // NUEVO: Infracciones detalladas por tipo/calle
+    JSONArray infrDet = new JSONArray();
+    // Simular 0-3 infracciones al azar
+    int n = int(random(0, 3.99));
+    for (int i = 0; i < n; i++) {
+      JSONObject d = new JSONObject();
+      d.setString("tipo", random(1) > 0.5 ? "A" : "B");
+      d.setInt("calle", int(random(1, 3.99))); // 1..3
+      infrDet.append(d);
+    }
+    currentData.setJSONArray("infracciones_detalle", infrDet);
+    
+    if (simulationEnabled) {
+      lastSource = serialMode && !isSerialTimedOut() ? "simulado_manual" : "simulado";
+    }
     updateCount++;
   }
   
@@ -198,30 +241,99 @@ class DataProvider {
     this.updateInterval = intervalMs;
   }
   
+  
   // Habilitar/deshabilitar modo serial (datos externos)
   void setSerialMode(boolean enabled) {
     this.serialMode = enabled;
+    if (enabled) {
+      lastSerialDataTime = millis(); // Resetear timeout
+      println("[DataProvider] Modo serial activado. Esperando datos reales...");
+    } else {
+      println("[DataProvider] Modo serial desactivado. Usando datos simulados.");
+    }
   }
   
   boolean isSerialMode() {
     return serialMode;
   }
   
+  // Nuevos métodos para control de simulación
+  void setSimulationEnabled(boolean enabled) {
+    this.simulationEnabled = enabled;
+    if (enabled) {
+      println("[DataProvider] Simulación activada.");
+      lastSource = "simulado_manual";
+    } else {
+      println("[DataProvider] Simulación desactivada. Solo datos reales.");
+      lastSource = serialMode ? "serial" : "desconectado";
+    }
+  }
+  
+  boolean isSimulationEnabled() {
+    return simulationEnabled;
+  }
+  
+  // Intercambiar entre modos
+  void toggleDataMode() {
+    if (serialMode && !simulationEnabled) {
+      // Está en modo serial puro -> cambiar a simulado
+      setSimulationEnabled(true);
+      println("[DataProvider] Cambiado a: DATOS SIMULADOS");
+    } else if (simulationEnabled) {
+      // Está en modo simulado -> cambiar a serial puro (si hay conexión)
+      if (serialMode) {
+        setSimulationEnabled(false);
+        println("[DataProvider] Cambiado a: DATOS REALES (Serial)");
+      } else {
+        println("[DataProvider] No hay conexión serial. Manteniendo simulación.");
+      }
+    }
+  }
+  
+  // Obtener estado actual del modo
+  String getCurrentMode() {
+    if (!serialMode) {
+      return "Solo Simulado";
+    } else if (simulationEnabled) {
+      return isSerialTimedOut() ? "Simulado (Serial timeout)" : "Simulado (Manual)";
+    } else {
+      return isSerialTimedOut() ? "Desconectado" : "Datos Reales";
+    }
+  }
+  
   // Inyectar datos externos (por ejemplo, desde Arduino)
   void setExternalData(JSONObject externalData) {
     if (externalData == null) return;
+    
     this.currentData = externalData;
     this.lastUpdateTime = millis();
+    this.lastSerialDataTime = millis(); // Actualizar timestamp de datos serial
     this.lastSource = "serial";
     updateCount++;
+    
+    // Si recibimos datos reales, automáticamente desactivar simulación (a menos que esté forzada)
+    if (simulationEnabled && serialMode) {
+      println("[DataProvider] Datos reales recibidos. Desactivando simulación automática.");
+      // No desactivar simulationEnabled aquí para mantener control manual
+    }
   }
+  
   
   // Forzar actualización de datos
   void forceUpdate() {
-    if (!serialMode) {
+    if (simulationEnabled) {
       generateNewData();
       lastUpdateTime = millis();
+      println("[DataProvider] Actualización forzada de datos simulados.");
+    } else if (serialMode) {
+      println("[DataProvider] En modo serial. No se pueden forzar datos simulados.");
     }
+  }
+  
+  // Forzar reconexión serial
+  void forceSerialReconnection() {
+    lastSerialDataTime = millis();
+    println("[DataProvider] Timeout de serial reseteado. Intentando reconectar...");
   }
 
   // --- Diagnóstico ---
@@ -237,6 +349,28 @@ class DataProvider {
     if (currentData == null) return "";
     if (currentData.hasKey("ts")) return currentData.getString("ts");
     return "";
+  }
+  
+  // Información de estado detallada
+  String getDetailedStatus() {
+    StringBuilder status = new StringBuilder();
+    status.append("=== ESTADO DEL DATA PROVIDER ===\n");
+    status.append("Modo actual: ").append(getCurrentMode()).append("\n");
+    status.append("Serial habilitado: ").append(serialMode ? "SÍ" : "NO").append("\n");
+    status.append("Simulación habilitada: ").append(simulationEnabled ? "SÍ" : "NO").append("\n");
+    status.append("Última fuente: ").append(lastSource).append("\n");
+    status.append("Actualizaciones totales: ").append(updateCount).append("\n");
+    status.append("Último timestamp: ").append(getLastTimestamp()).append("\n");
+    
+    if (serialMode) {
+      long timeSinceSerial = millis() - lastSerialDataTime;
+      status.append("Tiempo sin datos serial: ").append(timeSinceSerial).append("ms\n");
+      status.append("Timeout serial: ").append(isSerialTimedOut() ? "SÍ" : "NO").append("\n");
+    }
+    
+    status.append("Intervalo de actualización: ").append(updateInterval).append("ms\n");
+    status.append("=================================");
+    return status.toString();
   }
   
   // Obtener estadísticas rápidas

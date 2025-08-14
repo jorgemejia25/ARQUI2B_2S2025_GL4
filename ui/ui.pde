@@ -148,18 +148,50 @@ void keyPressed() {
     println("Datos actualizados manualmente");
   }
   
+  // NUEVO: Intercambiar entre datos simulados y reales
+  if (key == 'm' || key == 'M') {
+    dataProvider.toggleDataMode();
+    println("Modo cambiado a: " + dataProvider.getCurrentMode());
+  }
+  
+  // NUEVO: Forzar simulación ON/OFF
+  if (key == 's' || key == 'S') {
+    dataProvider.setSimulationEnabled(!dataProvider.isSimulationEnabled());
+    println("Simulación: " + (dataProvider.isSimulationEnabled() ? "ACTIVADA" : "DESACTIVADA"));
+  }
+  
+  // NUEVO: Reset timeout de serial (intentar reconectar)
+  if (key == 't' || key == 'T') {
+    dataProvider.forceSerialReconnection();
+    println("Timeout de serial reseteado");
+  }
+  
   if (key == 'c' || key == 'C') {
-    // Mostrar información del sistema
+    // Mostrar información detallada del sistema
     println("\n=== ESTADO DEL SISTEMA ===");
     println("Pantalla activa: " + screenManager.getCurrentScreenName());
     println("Índice de pantalla: " + screenManager.getCurrentScreenIndex());
     println("Total de pantallas: " + screenManager.getScreenCount());
     println("Serial conectado: " + serialConnected);
-    println("Serial modo activo: " + dataProvider.isSerialMode());
-    println("Proveedor - última fuente: " + dataProvider.getLastSource());
-    println("Proveedor - total actualizaciones: " + dataProvider.getUpdateCount());
-    println("Proveedor - último ts: " + dataProvider.getLastTimestamp());
     println("========================\n");
+    
+    // NUEVO: Estado detallado del DataProvider
+    println(dataProvider.getDetailedStatus());
+    println("");
+  }
+  
+  // NUEVO: Ayuda de controles
+  if (key == 'h' || key == 'H') {
+    println("\n=== CONTROLES DISPONIBLES ===");
+    println("R - Reset y actualización forzada");
+    println("U - Actualizar datos simulados");
+    println("M - Intercambiar modo (Simulado ↔ Real)");
+    println("S - Activar/Desactivar simulación");
+    println("T - Reset timeout serial");
+    println("C - Mostrar estado del sistema");
+    println("H - Mostrar esta ayuda");
+    println("1-4 - Cambiar pantalla directamente");
+    println("==============================\n");
   }
   
   // Navegación rápida con teclas numéricas

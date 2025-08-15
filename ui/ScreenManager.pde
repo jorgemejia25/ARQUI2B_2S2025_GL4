@@ -3,7 +3,7 @@
 class ScreenManager {
   private ArrayList<Screen> screens;
   private int currentScreenIndex = 0;
-  private String[] screenNames = {"Dashboard", "Monitoreo Humo", "Tráfico", "Configuración"};
+  private String[] screenNames = {"Dashboard", "Monitoreo Humo", "Semáforos", "Configuración"};
   
   ScreenManager() {
     screens = new ArrayList<Screen>();

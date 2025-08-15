@@ -9,9 +9,18 @@ class Theme {
   static final color DARK_GRAY = 0xFF4B5563;       // color(75, 85, 99)
   static final color WHITE = 0xFFFFFFFF;           // color(255)
   static final color GREEN = 0xFF10B981;           // color(16, 185, 129)
-  static final color ORANGE = 0xFFF59E0B;          // color(245, 158, 11)
-  static final color RED = 0xFFEF4444;             // color(239, 68, 68)
+  static final color ORANGE = 0xFFF59E0B;          // color(245, 158, 11)  static final color RED = 0xFFEF4444;             // color(239, 68, 68)
   static final color BLACK = 0xFF000000;           // color(0)
+  static final color RED = 0xFFEF4444;             // color(239, 68, 68)
+
+  // Colores adicionales para semáforos
+  static final color SUCCESS_COLOR = 0xFF10B981;   // Verde (mismo que GREEN)
+  static final color WARNING_COLOR = 0xFFF59E0B;   // Amarillo (mismo que ORANGE)
+  static final color DANGER_COLOR = 0xFFEF4444;    // Rojo (mismo que RED)
+  static final color PRIMARY_COLOR = 0xFF2962FF;   // Azul primario
+  static final color TEXT_COLOR = 0xFF4B5563;      // Gris oscuro
+  static final color BACKGROUND_COLOR = 0xFFF8F9FB; // Gris claro
+  static final color BORDER_COLOR = 0xFFE5E7EB;    // Gris medio
   
   // Dimensiones
   static final int CARD_WIDTH = 180;

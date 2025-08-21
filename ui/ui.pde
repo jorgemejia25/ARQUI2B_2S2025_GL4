@@ -43,16 +43,17 @@ void createScreenSystem() {
   float screenHeight = height - Theme.TOP_BAR_HEIGHT;
     // Crear todas las pantallas
   DashboardScreen dashboardScreen = new DashboardScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
-  SmokeMonitorScreen smokeScreen = new SmokeMonitorScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
+  IncendiosScreen incendiosScreen = new IncendiosScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   SemaforosScreen semaforosScreen = new SemaforosScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
+  DistanceScreen distanceScreen = new DistanceScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   ConfigScreen configScreen = new ConfigScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
+
     // Agregar pantallas al gestor en el orden correcto (debe coincidir con ScreenManager)
   screenManager.addScreen(dashboardScreen);  // 0: Dashboard
-  screenManager.addScreen(smokeScreen);      // 1: Monitoreo Humo  
+  screenManager.addScreen(incendiosScreen);  // 1: Incendios  
   screenManager.addScreen(semaforosScreen);  // 2: Semáforos
-  screenManager.addScreen(configScreen);     // 3: Tráfico (temporal)
+  screenManager.addScreen(distanceScreen);   // 3: Distancias
   screenManager.addScreen(configScreen);     // 4: Configuración
-  
   // Activar pantalla inicial (Dashboard)
   screenManager.setActiveScreen(0);
 }
@@ -127,6 +128,13 @@ void mousePressed() {
     SemaforosScreen semaforosScreen = (SemaforosScreen) currentScreen;
     semaforosScreen.handleMousePressed(mouseX, mouseY);
   }
+  if (currentScreen instanceof DashboardScreen) {
+    DashboardScreen ds = (DashboardScreen) currentScreen;
+    ds.handleMousePressed(mouseX, mouseY);
+  }
+  if (currentScreen instanceof ConfigScreen) {
+    ((ConfigScreen)currentScreen).handleMousePressed(mouseX, mouseY);
+  }
   
   // Cambiar pantalla según selección del sidebar
   int selectedIndex = sideBar.getSelected();
@@ -190,15 +198,16 @@ void keyPressed() {
     println("T - Reset timeout serial");
     println("C - Mostrar estado del sistema");
     println("H - Mostrar esta ayuda");
-    println("1-4 - Cambiar pantalla directamente");
+  println("1-5 - Cambiar pantalla directamente");
     println("==============================\n");
   }
   
   // Navegación rápida con teclas numéricas
-  if (key >= '1' && key <= '4') {
+  if (key >= '1' && key <= '5') {
     int screenIndex = key - '1';
     screenManager.setActiveScreen(screenIndex);
   }
+  // (Entrada de intervalo eliminada)
 }
 
 // --- Serial ---

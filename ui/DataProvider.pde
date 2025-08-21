@@ -5,6 +5,9 @@ class DataProvider {
   private JSONObject currentData;
   private long lastUpdateTime;
   private int updateInterval = 2000; // Actualizar cada 2 segundos
+  private int semaforoCycleMs = 5000; // Duración del ciclo rojo->verde (aprox) para semáforos
+  private long lastSemaforoChangeTime = 0;
+  private JSONObject semaforosCache = null; // cache para mantener estado hasta próximo ciclo
   
   // Modos de operación
   private boolean serialMode = false;
@@ -26,7 +29,19 @@ class DataProvider {
   private String[] paradaIds = {"P1", "P2", "P3", "P4", "P5", "P6"};
   
   // Zonas de gas y pánico (simplificado a 3 zonas)
-  private String[] zonaIds = {"Z1", "Z2", "Z3"};
+  private String[] zonaIds = {"Z1", "Z2"};
+
+  // NUEVO: 4 botones de pánico independientes
+  private String[] panicButtonIds = {"PB1", "PB2", "PB3", "PB4"};
+  private int[] panicButtonsCooldown = new int[4];
+
+  // --- NUEVO: Simulación de sismos y botón de pánico global ---
+  private int sismoCooldown = 0;          // Cuántos ciclos más permanece activo un sismo
+  private float lastSismoMagnitud = 0;    // Magnitud del sismo activo
+  private boolean panicButtonActive = false; // Estado momentáneo del botón de pánico
+  private int panicButtonCooldown = 0;       // Mantener activo algunos ciclos
+  private String panicButtonOrigin = "simulado"; // Origen de última activación
+  private String sismoOrigin = "";          // Origen del sismo (simulado/manual/serial)
   
   DataProvider() {
     lastUpdateTime = millis();
@@ -69,13 +84,9 @@ class DataProvider {
     // Timestamp actual
     currentData.setString("ts", getCurrentTimestamp());
     
-    // Generar estados de semáforos (legacy S1..S10)
-    JSONObject semaforos = new JSONObject();
-    for (String semaforoId : semaforoIds) {
-      String estado = semaforoStates[int(random(3))];
-      semaforos.setString(semaforoId, estado);
-    }
-    currentData.setJSONObject("semaforos", semaforos);
+  // Actualizar semáforos solo si tocó el ciclo
+  updateSemaforosIfNeeded();
+  currentData.setJSONObject("semaforos", semaforosCache);
 
     // NUEVO: Generar estados de semáforos por tipo y calle (A1..A3, B1..B3)
     JSONObject semaforosAB = new JSONObject();
@@ -110,6 +121,77 @@ class DataProvider {
       panico.setInt(zonaId, panicoState);
     }
     currentData.setJSONObject("panico", panico);
+
+    // --- NUEVO: Generar / mantener sismo ---
+    JSONObject sismo = new JSONObject();
+    if (sismoCooldown > 0) {
+      // Sismo en curso (manual o simulado previamente)
+      sismo.setInt("activo", 1);
+      sismo.setFloat("magnitud", lastSismoMagnitud);
+      sismo.setString("origen", sismoOrigin == null ? "" : sismoOrigin);
+      sismoCooldown--;
+    } else {
+      // Posible nuevo sismo aleatorio (5% prob.) sólo si no hay uno manual activo
+      if (random(1) > 0.95) {
+        lastSismoMagnitud = round(random(3.0, 6.8) * 10) / 10.0;
+        sismoCooldown = int(random(2, 5));
+        sismoOrigin = "simulado";
+        sismo.setInt("activo", 1);
+        sismo.setFloat("magnitud", lastSismoMagnitud);
+        sismo.setString("origen", sismoOrigin);
+      } else {
+        sismo.setInt("activo", 0);
+        sismo.setFloat("magnitud", 0);
+        sismo.setString("origen", "");
+        sismoOrigin = "";
+      }
+    }
+    currentData.setJSONObject("sismo", sismo);
+
+    // --- NUEVO: Botón de pánico global (simulado) ---
+    JSONObject panicButton = new JSONObject();
+    if (panicButtonCooldown > 0) {
+      panicButtonActive = true;
+      panicButtonCooldown--;
+    } else {
+      // 8% probabilidad de activarlo si no está activo (solo si no se activó manualmente en este ciclo)
+      if (!panicButtonActive && random(1) > 0.92) {
+        panicButtonActive = true;
+        panicButtonCooldown = int(random(1, 3));
+        panicButtonOrigin = "simulado";
+      } else if (panicButtonActive) {
+        // Desactivar si ya no hay cooldown
+        panicButtonActive = false;
+      }
+    }
+    panicButton.setInt("activo", panicButtonActive ? 1 : 0);
+    panicButton.setString("ts", getCurrentTimestamp());
+    panicButton.setString("origen", panicButtonOrigin);
+    currentData.setJSONObject("panic_button", panicButton);
+
+    // --- NUEVO: Colección de 4 botones de pánico independientes ---
+    JSONObject panicButtons = new JSONObject();
+    for (int i = 0; i < panicButtonIds.length; i++) {
+      int active;
+      if (panicButtonsCooldown[i] > 0) {
+        active = 1;
+        panicButtonsCooldown[i]--;
+      } else {
+        // 6% probabilidad de activación si está inactivo
+        if (random(1) > 0.94) {
+          active = 1;
+          panicButtonsCooldown[i] = int(random(1,3));
+        } else {
+          active = 0;
+        }
+      }
+      JSONObject btn = new JSONObject();
+      btn.setInt("activo", active);
+      btn.setString("ts", getCurrentTimestamp());
+      btn.setString("id", panicButtonIds[i]);
+      panicButtons.setJSONObject(panicButtonIds[i], btn);
+    }
+    currentData.setJSONObject("panic_buttons", panicButtons);
     
     // Generar infracciones (lista de paradas con infracciones) - legacy
     JSONArray infracciones = new JSONArray();
@@ -231,6 +313,73 @@ class DataProvider {
   JSONObject getPanicoData() {
     return getCurrentData().getJSONObject("panico");
   }
+
+  // NUEVO: Acceso a datos de sismo
+  JSONObject getSismoData() {
+    return getCurrentData().getJSONObject("sismo");
+  }
+
+  // NUEVO: Acceso a botón de pánico global
+  JSONObject getPanicButtonData() {
+    return getCurrentData().getJSONObject("panic_button");
+  }
+
+  // NUEVO: acceso a los 4 botones
+  JSONObject getPanicButtonsData() {
+    return getCurrentData().getJSONObject("panic_buttons");
+  }
+
+  // --- Sismos manuales ---
+  void triggerSismo(float magnitud, int duracionCiclos, String origin) {
+    if (magnitud <= 0) magnitud = round(random(3.0, 6.5) * 10) / 10.0;
+    if (duracionCiclos <= 0) duracionCiclos = 3;
+    lastSismoMagnitud = magnitud;
+    sismoCooldown = duracionCiclos;
+    sismoOrigin = origin == null ? "manual" : origin;
+    // Actualizar JSON inmediato
+    JSONObject sismo = new JSONObject();
+    sismo.setInt("activo", 1);
+    sismo.setFloat("magnitud", lastSismoMagnitud);
+    sismo.setString("origen", sismoOrigin);
+    currentData.setJSONObject("sismo", sismo);
+  }
+
+  void resetSismo() {
+    lastSismoMagnitud = 0;
+    sismoCooldown = 0;
+    sismoOrigin = "";
+    JSONObject sismo = new JSONObject();
+    sismo.setInt("activo", 0);
+    sismo.setFloat("magnitud", 0);
+    sismo.setString("origen", "");
+    currentData.setJSONObject("sismo", sismo);
+  }
+
+  // Activar manualmente el botón de pánico (desde UI)
+  void triggerPanicButton(String origin) {
+    panicButtonActive = true;
+    panicButtonCooldown = 2; // mantener visible unos ciclos
+    panicButtonOrigin = origin == null ? "manual" : origin;
+    // Forzar actualización inmediata del JSON
+    if (simulationEnabled) {
+      // regenerar solo la parte del botón sin tocar otros datos
+      JSONObject pb = new JSONObject();
+      pb.setInt("activo", 1);
+      pb.setString("ts", getCurrentTimestamp());
+      pb.setString("origen", panicButtonOrigin);
+      currentData.setJSONObject("panic_button", pb);
+    }
+  }
+
+  void resetPanicButton() {
+    panicButtonActive = false;
+    panicButtonCooldown = 0;
+    JSONObject pb = new JSONObject();
+    pb.setInt("activo", 0);
+    pb.setString("ts", getCurrentTimestamp());
+    pb.setString("origen", panicButtonOrigin);
+    currentData.setJSONObject("panic_button", pb);
+  }
   
   JSONArray getInfraccionesData() {
     return getCurrentData().getJSONArray("infracciones");
@@ -240,6 +389,11 @@ class DataProvider {
   void setUpdateInterval(int intervalMs) {
     this.updateInterval = intervalMs;
   }
+  int getUpdateInterval() { return updateInterval; }
+  
+  // Ciclo de semáforos
+  void setSemaforoCycle(int ms) { semaforoCycleMs = ms; }
+  int getSemaforoCycle() { return semaforoCycleMs; }
   
   
   // Habilitar/deshabilitar modo serial (datos externos)
@@ -409,6 +563,29 @@ class DataProvider {
     
     return new TrafficStats(rojosCount, verdesCount, amarillosCount, 
                            panicoCount, infraccionesCount, gasPromedio);
+  }
+
+  // Actualiza los semáforos solo cuando el ciclo se cumple
+  void updateSemaforosIfNeeded() {
+    if (semaforosCache == null) {
+      semaforosCache = new JSONObject();
+      for (String id : semaforoIds) {
+        semaforosCache.setString(id, semaforoStates[int(random(3))]);
+      }
+      lastSemaforoChangeTime = millis();
+      return;
+    }
+    if (millis() - lastSemaforoChangeTime >= semaforoCycleMs) {
+      for (String id : semaforoIds) {
+        String estado = semaforosCache.getString(id);
+        String nuevo;
+        if (estado.equals("ROJO")) nuevo = "VERDE";
+        else if (estado.equals("VERDE")) nuevo = "AMARILLO";
+        else nuevo = "ROJO";
+        semaforosCache.setString(id, nuevo);
+      }
+      lastSemaforoChangeTime = millis();
+    }
   }
 }
 

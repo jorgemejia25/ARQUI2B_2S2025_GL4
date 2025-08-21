@@ -24,7 +24,7 @@ class SmokeMonitorScreen extends Screen {
     float cardSpacing = Theme.CARD_WIDTH + 20;
     
     // Tarjetas para cada zona de gas
-    for (int i = 1; i <= 3; i++) {
+  for (int i = 1; i <= 2; i++) {
       String zoneId = "Z" + i;
       InfoCard gasCard = new InfoCard(
         "Gas " + zoneId, 
@@ -130,7 +130,7 @@ class SmokeMonitorScreen extends Screen {
     boolean hasPanic = false;
     boolean hasHighGas = false;
     
-    for (int i = 1; i <= 3; i++) {
+  for (int i = 1; i <= 2; i++) {
       String zoneId = "Z" + i;
       if (panicData.getInt(zoneId) == 1) hasPanic = true;
       if (gasData.getInt(zoneId) > 250) hasHighGas = true;

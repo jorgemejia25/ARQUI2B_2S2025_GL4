@@ -16,16 +16,11 @@ class IncendiosScreen extends Screen {
   void initializeComponents() {
     nivelCards = new ArrayList<InfoCard>();
     estadoCards = new ArrayList<InfoCard>();
-<<<<<<< Updated upstream
-    float cardY = y + 80;
-    float cardSpacing = Theme.CARD_WIDTH + 20;
-=======
-    // Mayor separación del título superior
+  // Mayor separación del título superior
   float topPadding = 115; // padding ampliado
-    float cardY = y + topPadding;
-    float horizontalPadding = 40; // antes 20
-    float cardSpacing = Theme.CARD_WIDTH + 40; // más aire entre columnas
->>>>>>> Stashed changes
+  float cardY = y + topPadding;
+  float horizontalPadding = 40; // antes 20
+  float cardSpacing = Theme.CARD_WIDTH + 40; // más aire entre columnas
     // Dos zonas dinámicas (Z1, Z2)
     for (int i = 1; i <= 2; i++) {
       String zoneId = "Z" + i;
@@ -33,11 +28,7 @@ class IncendiosScreen extends Screen {
         "Nivel " + zoneId,
         "0 ppm",
         Theme.GREEN,
-<<<<<<< Updated upstream
-        x + 20 + (i-1) * cardSpacing,
-=======
-        x + horizontalPadding + (i-1) * cardSpacing,
->>>>>>> Stashed changes
+  x + horizontalPadding + (i-1) * cardSpacing,
         cardY
       );
       nivelCards.add(nivel);
@@ -45,14 +36,6 @@ class IncendiosScreen extends Screen {
         "Incendio " + zoneId,
         "Normal",
         Theme.GREEN,
-<<<<<<< Updated upstream
-        x + 20 + (i-1) * cardSpacing,
-        cardY + 140
-      );
-      estadoCards.add(estado);
-    }
-    fireChart = new FireTrendChart(x + 20, cardY + 320, width - 40, 180, dataProvider);
-=======
         x + horizontalPadding + (i-1) * cardSpacing,
         cardY + 150 // un poco más de separación vertical
       );
@@ -60,7 +43,6 @@ class IncendiosScreen extends Screen {
     }
     // Reubicar gráfico más abajo por el nuevo padding
     fireChart = new FireTrendChart(x + horizontalPadding, cardY + 350, width - horizontalPadding*2, 190, dataProvider);
->>>>>>> Stashed changes
   }
   
   void renderContent() {
@@ -121,15 +103,6 @@ class IncendiosScreen extends Screen {
     if (fireDetected && anyCritical) { msg = "EMERGENCIA: Incendio y niveles críticos"; bg = Theme.RED; }
     else if (fireDetected) { msg = "ALERTA: Incendio detectado"; bg = Theme.RED; }
     else { msg = "Peligro: Niveles elevados de humo"; bg = Theme.ORANGE; }
-<<<<<<< Updated upstream
-    float bannerH = 40;
-    float bannerY = y + 60;
-    fill(bg); noStroke(); rect(x + 20, bannerY, width - 40, bannerH, 6);
-    fill(Theme.WHITE); textAlign(CENTER, CENTER); textSize(Theme.NORMAL_SIZE);
-    text(msg, x + width/2, bannerY + bannerH/2);
-    if (millis() % 1000 < 450) { // borde parpadeante
-      stroke(bg); strokeWeight(3); noFill(); rect(x + 15, y + 15, width - 30, height - 30, 10); noStroke();
-=======
     float bannerH = 44;
     float bannerY = y + 90; // antes 60, ahora debajo del nuevo padding
     float sidePad = 40;
@@ -138,26 +111,10 @@ class IncendiosScreen extends Screen {
     text(msg, x + width/2, bannerY + bannerH/2);
     if (millis() % 1000 < 450) { // borde parpadeante (ajustado a nuevo margen)
       stroke(bg); strokeWeight(3); noFill(); rect(x + 30, y + 30, width - 60, height - 60, 14); noStroke();
->>>>>>> Stashed changes
     }
   }
   
   void renderInfoPanel() {
-<<<<<<< Updated upstream
-    float infoY = y + height - 100;
-    drawSoftShadow(x + 20, infoY, width - 40, 80, 2);
-    fill(Theme.WHITE); noStroke(); rect(x + 20, infoY, width - 40, 80, 6);
-    fill(Theme.DARK_GRAY); textAlign(LEFT, TOP); textSize(Theme.NORMAL_SIZE);
-    text("Resumen de Incendios", x + 35, infoY + 12);
-    TrafficStats stats = dataProvider.getStats();
-    fill(Theme.MEDIUM_GRAY); textSize(Theme.SMALL_SIZE);
-    text("Zonas con incendio: " + stats.zonasPanico, x + 35, infoY + 32);
-    text("Promedio ppm: " + stats.gasPromedio, x + 35, infoY + 46);
-    text("Infracciones: " + stats.infracciones, x + 35, infoY + 60);
-    JSONObject cur = dataProvider.getCurrentData();
-    text("Última act.: " + cur.getString("ts"), x + 220, infoY + 32);
-    text("Rangos: Normal<180 | Mod 180-200 | Alto 200-250 | Crítico>250", x + 220, infoY + 46);
-=======
   float infoY = y + height - 110;
   float sidePad = 40;
   drawSoftShadow(x + sidePad, infoY, width - sidePad*2, 90, 2);
@@ -172,7 +129,6 @@ class IncendiosScreen extends Screen {
     JSONObject cur = dataProvider.getCurrentData();
   text("Última act.: " + cur.getString("ts"), x + sidePad + 260, infoY + 34);
   text("Rangos: Normal<180 | Mod 180-200 | Alto 200-250 | Crítico>250", x + sidePad + 260, infoY + 48);
->>>>>>> Stashed changes
   }
 }
 

@@ -4,11 +4,7 @@ class ScreenManager {
   private ArrayList<Screen> screens;
   private int currentScreenIndex = 0;
   // Nombres de pantallas (mantener sincronizado con el orden de agregado en createScreenSystem())
-<<<<<<< Updated upstream
-  private String[] screenNames = {"Dashboard", "Incendios", "Semáforos", "Distancias", "Configuración"};
-=======
   private String[] screenNames = {"Dashboard", "Incendios", "Semáforos", "Distancias", "Mapa", "Configuración"};
->>>>>>> Stashed changes
   
   ScreenManager() {
     screens = new ArrayList<Screen>();

@@ -46,10 +46,7 @@ void createScreenSystem() {
   IncendiosScreen incendiosScreen = new IncendiosScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   SemaforosScreen semaforosScreen = new SemaforosScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
   DistanceScreen distanceScreen = new DistanceScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
-<<<<<<< Updated upstream
-=======
   MapScreen mapScreen = new MapScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
->>>>>>> Stashed changes
   ConfigScreen configScreen = new ConfigScreen(screenX, screenY, screenWidth, screenHeight, dataProvider);
 
     // Agregar pantallas al gestor en el orden correcto (debe coincidir con ScreenManager)
@@ -57,12 +54,8 @@ void createScreenSystem() {
   screenManager.addScreen(incendiosScreen);  // 1: Incendios  
   screenManager.addScreen(semaforosScreen);  // 2: Semáforos
   screenManager.addScreen(distanceScreen);   // 3: Distancias
-<<<<<<< Updated upstream
-  screenManager.addScreen(configScreen);     // 4: Configuración
-=======
   screenManager.addScreen(mapScreen);        // 4: Mapa
   screenManager.addScreen(configScreen);     // 5: Configuración
->>>>>>> Stashed changes
   // Activar pantalla inicial (Dashboard)
   screenManager.setActiveScreen(0);
 }
@@ -212,11 +205,7 @@ void keyPressed() {
   }
   
   // Navegación rápida con teclas numéricas
-<<<<<<< Updated upstream
-  if (key >= '1' && key <= '5') {
-=======
   if (key >= '1' && key <= '6') {
->>>>>>> Stashed changes
     int screenIndex = key - '1';
     screenManager.setActiveScreen(screenIndex);
   }

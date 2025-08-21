@@ -281,12 +281,8 @@ class DashboardScreen extends Screen {
   float maxYForAlerts = y + height - minGapBottom;
   if (baseY > maxYForAlerts) baseY = maxYForAlerts;
   // Si el espacio es muy reducido, reducir altura de cada card
-<<<<<<< Updated upstream
-    JSONObject sismo = dataProvider.getSismoData();
-    JSONObject panico = dataProvider.getPanicoData();
-=======
   JSONObject sismo = dataProvider.getSismoData();
->>>>>>> Stashed changes
+  JSONObject panico = dataProvider.getPanicoData();
 
     boolean sismoActivo = sismo.getInt("activo") == 1;
     float magnitud = sismo.getFloat("magnitud");

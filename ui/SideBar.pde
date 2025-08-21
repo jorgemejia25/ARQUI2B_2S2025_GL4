@@ -23,10 +23,7 @@ class SideBar {
       "Incendios", 
       "Semáforos",
       "Distancias",
-<<<<<<< Updated upstream
-=======
       "Mapa",
->>>>>>> Stashed changes
       "Configuración" 
     };
     

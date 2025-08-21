@@ -2,7 +2,7 @@ import java.util.HashMap;
 
 class SemaforosScreen extends Screen {
   private ArrayList<SemaforoVisual> semaforosVisuales;
-  private ArrayList<SemaforoVisual> semaforosAB; // A1..A3 (fila 1) y B1..B3 (fila 2)
+  private ArrayList<SemaforoVisual> semaforosAB; // A1..A5 (fila 1) y B1..B5 (fila 2)
   private TrafficStats stats;
   private DataProvider dataProvider;
   
@@ -41,16 +41,16 @@ class SemaforosScreen extends Screen {
     
     // (legacy S1..S10 omitido)
 
-    // NUEVO: grilla 2x3: fila 1 = A1..A3, fila 2 = B1..B3; columnas = calles (1..3)
-    int colsAB = 3;
+    // NUEVO: grilla 2x5: fila 1 = A1..A5, fila 2 = B1..B5
+    int colsAB = 5;
     int rowsAB = 2;
-    float gridPaddingX = 60; // más ancho para separar columnas
-    float gridTop = y + 140;  // pegado al panel de estadísticas
+    float gridPaddingX = 40;
+    float gridTop = y + 140;
     float gridWidth = width - (2 * gridPaddingX);
     float gridSpacingX = gridWidth / colsAB;
-    float cellW = 70;
-    float cellH = 100;
-    float rowGap = 60; // mayor separación vertical entre filas
+    float cellW = 60;
+    float cellH = 95;
+    float rowGap = 55;
     for (int row = 0; row < rowsAB; row++) {
       for (int col = 0; col < colsAB; col++) {
         float gx = x + gridPaddingX + (col * gridSpacingX) + (gridSpacingX / 2) - (cellW/2);
@@ -99,10 +99,12 @@ class SemaforosScreen extends Screen {
     textAlign(CENTER);
     textSize(Theme.SMALL_SIZE);
     // Columnas
-    if (semaforosAB.size() >= 6) {
-      text("Calle 1", semaforosAB.get(0).x + 35, semaforosAB.get(0).y - 36);
-      text("Calle 2", semaforosAB.get(1).x + 35, semaforosAB.get(1).y - 36);
-      text("Calle 3", semaforosAB.get(2).x + 35, semaforosAB.get(2).y - 36);
+    if (semaforosAB.size() >= 10) {
+      text("C1", semaforosAB.get(0).x + 25, semaforosAB.get(0).y - 30);
+      text("C2", semaforosAB.get(1).x + 25, semaforosAB.get(1).y - 30);
+      text("C3", semaforosAB.get(2).x + 25, semaforosAB.get(2).y - 30);
+      text("C4", semaforosAB.get(3).x + 25, semaforosAB.get(3).y - 30);
+      text("C5", semaforosAB.get(4).x + 25, semaforosAB.get(4).y - 30);
     }
 
     for (SemaforoVisual s : semaforosAB) {
@@ -157,7 +159,7 @@ class SemaforosScreen extends Screen {
     // Total
     textX += 140;
     fill(Theme.TEXT_COLOR);
-    text("Total: 10 semáforos", textX, textY);
+  text("Total: 10 semáforos", textX, textY);
   }
   
   void renderLeyenda() {

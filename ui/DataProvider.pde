@@ -88,12 +88,12 @@ class DataProvider {
   updateSemaforosIfNeeded();
   currentData.setJSONObject("semaforos", semaforosCache);
 
-    // NUEVO: Generar estados de semáforos por tipo y calle (A1..A3, B1..B3)
+  // NUEVO: Generar estados de semáforos por tipo y calle (A1..A5, B1..B5) => 10
     JSONObject semaforosAB = new JSONObject();
-    for (int i = 1; i <= 3; i++) {
+  for (int i = 1; i <= 5; i++) {
       semaforosAB.setString("A" + i, semaforoStates[int(random(3))]);
     }
-    for (int i = 1; i <= 3; i++) {
+  for (int i = 1; i <= 5; i++) {
       semaforosAB.setString("B" + i, semaforoStates[int(random(3))]);
     }
     currentData.setJSONObject("semaforosAB", semaforosAB);
@@ -542,11 +542,19 @@ class DataProvider {
       else if (estado.equals("AMARILLO")) amarillosCount++;
     }
     
-    // Contar zonas en pánico
-    JSONObject panico = data.getJSONObject("panico");
+    // Contar zonas en pánico (ahora derivadas de botones de pánico activos)
     int panicoCount = 0;
-    for (String zonaId : zonaIds) {
-      if (panico.getInt(zonaId) == 1) panicoCount++;
+    if (data.hasKey("panic_buttons")) {
+      try {
+        JSONObject pbs = data.getJSONObject("panic_buttons");
+        String[] pbKeys = (String[]) pbs.keys().toArray(new String[0]);
+        for (int i = 0; i < pbKeys.length; i++) {
+          JSONObject btn = pbs.getJSONObject(pbKeys[i]);
+            if (btn.hasKey("activo") && btn.getInt("activo") == 1) panicoCount++;
+        }
+      } catch(Exception ex) {
+        // Silenciar errores en caso de formato inesperado
+      }
     }
     
     // Contar infracciones

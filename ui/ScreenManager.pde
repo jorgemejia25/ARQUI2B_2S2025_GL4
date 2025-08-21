@@ -3,7 +3,8 @@
 class ScreenManager {
   private ArrayList<Screen> screens;
   private int currentScreenIndex = 0;
-  private String[] screenNames = {"Dashboard", "Monitoreo Humo", "Semáforos", "Configuración"};
+  // Nombres de pantallas (mantener sincronizado con el orden de agregado en createScreenSystem())
+  private String[] screenNames = {"Dashboard", "Incendios", "Semáforos", "Distancias", "Configuración"};
   
   ScreenManager() {
     screens = new ArrayList<Screen>();
@@ -24,7 +25,12 @@ class ScreenManager {
       currentScreenIndex = index;
       screens.get(currentScreenIndex).setActive(true);
       
-      println("Pantalla cambiada a: " + screenNames[index]);
+      // Protección por si screenNames quedó desincronizado (evitar ArrayIndexOutOfBounds)
+      if (index >= 0 && index < screenNames.length) {
+        println("Pantalla cambiada a: " + screenNames[index]);
+      } else {
+        println("Pantalla cambiada a índice " + index + " (nombre no registrado)" );
+      }
     }
   }
   

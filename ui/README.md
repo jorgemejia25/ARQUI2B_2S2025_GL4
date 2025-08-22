@@ -35,7 +35,7 @@ processing-java --sketch=ui --run
     "Z2": 180,
     "Z3": 175
   },
-  "panico": {
+  "zumbador": {
     "Z1": 0,
     "Z2": 1,
     "Z3": 0

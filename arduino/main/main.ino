@@ -548,30 +548,7 @@ void emitUIJson()
     Serial.print(millis());
     Serial.print("\",");
 
-    // Semáforos A/B por calle (A1..A3, B1..B3)
-    Serial.print("\"semaforosAB\":{");
-    for (int i = 1; i <= 3; i++)
-    {
-        Serial.print('\"');
-        Serial.print('A');
-        Serial.print(i);
-        Serial.print("\":\"");
-        Serial.print(a);
-        Serial.print('\"');
-        Serial.print(',');
-    }
-    for (int i = 1; i <= 3; i++)
-    {
-        Serial.print('\"');
-        Serial.print('B');
-        Serial.print(i);
-        Serial.print("\":\"");
-        Serial.print(b);
-        Serial.print('\"');
-        if (i < 3)
-            Serial.print(',');
-    }
-    Serial.print("},");
+    // Nota: no se emite "semaforosAB" (redundante). Solo se envía el mapa "semaforos" (S1..S10) más abajo.
 
     // Semáforos S1..S10 (S1..S5 = grupo A, S6..S10 = grupo B)
     Serial.print("\"semaforos\":{");
@@ -588,107 +565,8 @@ void emitUIJson()
     }
     Serial.print("},");
 
-    // Infracciones detalladas por calle y tipo (A/B) usando zonas 3/32/61
-    bool redA = isGroupRed_(SEM_A);
-    bool redB = isGroupRed_(SEM_B);
-    bool calleA[3] = {false, false, false};
-    bool calleB[3] = {false, false, false};
-    const uint8_t corridorSensors[] = {TM1, TV3, TU1, TU2};
-    const size_t corridorCount = sizeof(corridorSensors) / sizeof(corridorSensors[0]);
-    for (size_t i = 0; i < corridorCount; i++)
-    {
-        uint8_t sid = corridorSensors[i];
-        int8_t z = zoneForDistance(lastCm[sid]);
-        if (z >= 0 && z < 3)
-        {
-            if (redA)
-                calleA[z] = true;
-            if (redB)
-                calleB[z] = true;
-        }
-    }
-    Serial.print("\"infracciones_detalle\":[");
-    bool firstDet = true;
-    for (int zi = 0; zi < 3; zi++)
-    {
-        if (calleA[zi])
-        {
-            if (!firstDet)
-                Serial.print(',');
-            Serial.print('{');
-            Serial.print("\"tipo\":\"A\",");
-            Serial.print("\"calle\":");
-            Serial.print(zi == 0 ? 1 : (zi == 1 ? 2 : 3));
-            Serial.print('}');
-            firstDet = false;
-        }
-    }
-    for (int zi = 0; zi < 3; zi++)
-    {
-        if (calleB[zi])
-        {
-            if (!firstDet)
-                Serial.print(',');
-            Serial.print('{');
-            Serial.print("\"tipo\":\"B\",");
-            Serial.print("\"calle\":");
-            Serial.print(zi == 0 ? 1 : (zi == 1 ? 2 : 3));
-            Serial.print('}');
-            firstDet = false;
-        }
-    }
-    Serial.print("],");
+    // infracciones_detalle removed: Processing deriva infracciones desde semáforos y distancias
 
-    // Infracciones por semáforo (1 si hay presencia en grupo en rojo)
-    bool groupAIsRed = isGroupRed_(SEM_A);
-    bool groupBIsRed = isGroupRed_(SEM_B);
-    bool anyA = false;
-    bool anyB = false;
-    if (groupAIsRed)
-    {
-        for (uint8_t id = 0; id < N_SENSORS; id++)
-        {
-            if (semGroup[id] == SEM_A && wasBelow[id])
-            {
-                anyA = true;
-                break;
-            }
-        }
-    }
-    if (groupBIsRed)
-    {
-        for (uint8_t id = 0; id < N_SENSORS; id++)
-        {
-            if (semGroup[id] == SEM_B && wasBelow[id])
-            {
-                anyB = true;
-                break;
-            }
-        }
-    }
-    Serial.print("\"infracciones_semaforos\":{");
-    for (int i = 1; i <= 10; i++)
-    {
-        Serial.print('\"');
-        Serial.print('S');
-        Serial.print(i);
-        Serial.print("\":");
-        Serial.print(i <= 5 ? (anyA ? 1 : 0) : (anyB ? 1 : 0));
-        if (i < 10)
-            Serial.print(',');
-    }
-    Serial.print("},");
-
-    // Distancias P1..P6 (usar algunos sensores reales)
-    int dP1 = (int)round(lastCm[TM1]);
-    int dP2 = (int)round(lastCm[TM2]);
-    int dP3 = (int)round(lastCm[TU3]);
-    int dP4 = (int)round(lastCm[TU4]);
-    int dP5 = (int)round(lastCm[TV2]);
-    int dP6 = (int)round(lastCm[TV5]);
-    Serial.print("\"dist_cm\":{");
-    Serial.print("\"P1\":");
-    Serial.print(dP1);
     Serial.print(',');
     Serial.print("\"P2\":");
     Serial.print(dP2);
@@ -718,7 +596,7 @@ void emitUIJson()
     Serial.print(gas3);
     Serial.print("},");
 
-    Serial.print("\"panico\":{");
+    Serial.print("\"zumbador\":{");
     Serial.print("\"Z1\":");
     Serial.print(pan1);
     Serial.print(',');

@@ -36,9 +36,9 @@ class DashboardScreen extends Screen {
                                            x + 20 + cardSpacing, cardY);
     summaryCards.add(infraccionesCard);
     
-    InfoCard panicoCard = new InfoCard("Zonas Pánico", "0", Theme.RED, 
-                                      x + 20 + cardSpacing * 2, cardY);
-    summaryCards.add(panicoCard);
+  InfoCard zumbadorCard = new InfoCard("Zonas Zumbador", "0", Theme.RED, 
+                    x + 20 + cardSpacing * 2, cardY);
+  summaryCards.add(zumbadorCard);
     
     InfoCard gasCard = new InfoCard("Gas Promedio", "0 ppm", Theme.PRIMARY_BLUE, 
                                    x + 20 + cardSpacing * 3, cardY);
@@ -111,7 +111,7 @@ class DashboardScreen extends Screen {
     
     summaryCards.get(0).updateValue(str(stats.semaforosVerdes));
     summaryCards.get(1).updateValue(str(stats.infracciones));
-    summaryCards.get(2).updateValue(str(stats.zonasPanico));
+  summaryCards.get(2).updateValue(str(stats.zonasZumbador));
     summaryCards.get(3).updateValue(stats.gasPromedio + " ppm");
   }
   
@@ -221,7 +221,7 @@ class DashboardScreen extends Screen {
     String systemStatus = "Sistema Operativo";
     color statusColor = Theme.GREEN;
     
-    if (stats.zonasPanico > 0 || stats.gasPromedio > 250) {
+  if (stats.zonasZumbador > 0 || stats.gasPromedio > 250) {
       systemStatus = "¡EMERGENCIA ACTIVA!";
       statusColor = Theme.RED;
     } else if (stats.infracciones > 3 || stats.gasPromedio > 200) {
@@ -260,7 +260,7 @@ class DashboardScreen extends Screen {
                       stats.semaforosAmarillos + " amarillos";
     text(infoLine1, x + 35, infoY + 40);
     
-    String infoLine2 = "Monitoreo: " + stats.zonasPanico + " zonas pánico, " + 
+  String infoLine2 = "Monitoreo: " + stats.zonasZumbador + " zonas zumbador, " + 
                       stats.infracciones + " infracciones, " + 
                       "Gas: " + stats.gasPromedio + " ppm";
     text(infoLine2, x + 35, infoY + 55);
@@ -282,7 +282,7 @@ class DashboardScreen extends Screen {
   if (baseY > maxYForAlerts) baseY = maxYForAlerts;
   // Si el espacio es muy reducido, reducir altura de cada card
   JSONObject sismo = dataProvider.getSismoData();
-  JSONObject panico = dataProvider.getPanicoData();
+  JSONObject zumbador = dataProvider.getZumbadorData();
 
     boolean sismoActivo = sismo.getInt("activo") == 1;
     float magnitud = sismo.getFloat("magnitud");

@@ -93,11 +93,11 @@ class SmokeMonitorScreen extends Screen {
   }
   
   void updatePanicData() {
-    JSONObject panicData = dataProvider.getPanicoData();
+    JSONObject panicData = dataProvider.getZumbadorData();
     
     for (int i = 0; i < panicCards.size(); i++) {
       String zoneId = "Z" + (i + 1);
-      int panicLevel = panicData.getInt(zoneId);
+  int panicLevel = panicData.getInt(zoneId);
       
       InfoCard card = panicCards.get(i);
       String statusText = panicLevel == 1 ? "¡PÁNICO!" : "Normal";
@@ -124,7 +124,7 @@ class SmokeMonitorScreen extends Screen {
   
   void renderAlerts() {
     // Verificar si hay zonas en pánico o gas alto
-    JSONObject panicData = dataProvider.getPanicoData();
+  JSONObject panicData = dataProvider.getZumbadorData();
     JSONObject gasData = dataProvider.getGasData();
     
     boolean hasPanic = false;
@@ -206,7 +206,7 @@ class SmokeMonitorScreen extends Screen {
     TrafficStats stats = dataProvider.getStats();
     fill(Theme.MEDIUM_GRAY);
     textSize(Theme.SMALL_SIZE);
-    text("Zonas en pánico: " + stats.zonasPanico, x + 35, infoY + 32);
+  text("Zonas zumbador: " + stats.zonasZumbador, x + 35, infoY + 32);
     text("Gas promedio: " + stats.gasPromedio + " ppm", x + 35, infoY + 46);
     text("Infracciones: " + stats.infracciones, x + 35, infoY + 60);
     

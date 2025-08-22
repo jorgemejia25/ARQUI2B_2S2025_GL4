@@ -71,10 +71,10 @@ class IncendiosScreen extends Screen {
   }
   
   void updateEstados() {
-    JSONObject panic = dataProvider.getPanicoData(); // Reutilizamos panico como bandera de incendio detectado (digital)
+    JSONObject panic = dataProvider.getZumbadorData(); // Reutilizamos zumbador como bandera de incendio detectado (digital)
     for (int i = 0; i < estadoCards.size(); i++) {
       String zoneId = "Z" + (i+1);
-      int fire = panic.getInt(zoneId); // 1 => incendio confirmado
+  int fire = panic.getInt(zoneId); // 1 => incendio confirmado
       InfoCard card = estadoCards.get(i);
       String txt = fire == 1 ? "INCENDIO" : "Normal";
       color col = fire == 1 ? Theme.RED : Theme.GREEN;
@@ -123,7 +123,7 @@ class IncendiosScreen extends Screen {
   text("Resumen de Incendios", x + sidePad + 15, infoY + 14);
     TrafficStats stats = dataProvider.getStats();
     fill(Theme.MEDIUM_GRAY); textSize(Theme.SMALL_SIZE);
-  text("Zonas con incendio: " + stats.zonasPanico, x + sidePad + 15, infoY + 34);
+  text("Zonas con incendio: " + stats.zonasZumbador, x + sidePad + 15, infoY + 34);
   text("Promedio ppm: " + stats.gasPromedio, x + sidePad + 15, infoY + 48);
   text("Infracciones: " + stats.infracciones, x + sidePad + 15, infoY + 62);
     JSONObject cur = dataProvider.getCurrentData();

@@ -48,6 +48,41 @@ class DataProvider {
     lastSerialDataTime = millis();
     generateNewData();
   }
+
+  // Derivar infracciones a partir de semáforos (S1..S10) y distancias en paradas (P1..P6)
+  // Regla simple y documentada: si el semáforo correspondiente está en ROJO y la distancia
+  // en la parada asociada < 50cm => contar como infracción para ese semáforo.
+  // Asociaciones (simplificadas): P1->S1, P2->S2, P3->S3, P4->S4, P5->S5, P6->S6
+  JSONArray computeInfraccionesFromSemaforos(JSONObject data) {
+    JSONArray result = new JSONArray();
+    try {
+      JSONObject semaforos = data.getJSONObject("semaforos");
+      JSONObject dist = data.getJSONObject("dist_cm");
+      // Umbral de infracción en cm
+      int umbral = 50;
+      // Mapear semáforos S1..S10 a paradas P1..P6 de forma que todos los semáforos
+      // se puedan evaluar: S1->P1, S2->P2, ... S6->P6, S7->P1, S8->P2, S9->P3, S10->P4
+      for (int i = 0; i < semaforoIds.length; i++) {
+        String semId = semaforoIds[i];
+        int paradaIndex = i; // índice correspondiente a la parada
+        if (paradaIndex >= paradaIds.length) {
+          // envolver para cubrir S7..S10
+          paradaIndex = paradaIndex % paradaIds.length;
+        }
+        String paradaId = paradaIds[paradaIndex];
+        if (semaforos.hasKey(semId) && dist.hasKey(paradaId)) {
+          String estado = semaforos.getString(semId);
+          int d = dist.getInt(paradaId);
+          if (estado.equals("ROJO") && d < umbral) {
+            result.append(semId);
+          }
+        }
+      }
+    } catch (Exception e) {
+      // si faltan datos, devolver arreglo vacío
+    }
+    return result;
+  }
   // Método principal para obtener datos actuales
   JSONObject getCurrentData() {
     // Verificar timeout de datos serial
@@ -88,15 +123,8 @@ class DataProvider {
   updateSemaforosIfNeeded();
   currentData.setJSONObject("semaforos", semaforosCache);
 
-  // NUEVO: Generar estados de semáforos por tipo y calle (A1..A5, B1..B5) => 10
-    JSONObject semaforosAB = new JSONObject();
-  for (int i = 1; i <= 5; i++) {
-      semaforosAB.setString("A" + i, semaforoStates[int(random(3))]);
-    }
-  for (int i = 1; i <= 5; i++) {
-      semaforosAB.setString("B" + i, semaforoStates[int(random(3))]);
-    }
-    currentData.setJSONObject("semaforosAB", semaforosAB);
+  // Nota: se utiliza únicamente el mapa "semaforos" (S1..S10). Evitamos generar estructuras redundantes.
+  // Si se desea una vista por calles, el UI puede derivarla desde "semaforos".
     
     // Generar distancias en paradas (en cm)
     JSONObject distancias = new JSONObject();
@@ -114,13 +142,13 @@ class DataProvider {
     }
     currentData.setJSONObject("gas_ppm", gas);
     
-    // Generar estado de pánico (0 o 1)
-    JSONObject panico = new JSONObject();
+    // Generar estado de zumbador por zona (antes 'panico') (0 o 1)
+    JSONObject zumbador = new JSONObject();
     for (String zonaId : zonaIds) {
-      int panicoState = random(1) > 0.8 ? 1 : 0; // 20% probabilidad de pánico
-      panico.setInt(zonaId, panicoState);
+      int zState = random(1) > 0.8 ? 1 : 0; // 20% probabilidad de activación
+      zumbador.setInt(zonaId, zState);
     }
-    currentData.setJSONObject("panico", panico);
+    currentData.setJSONObject("zumbador", zumbador);
 
     // --- NUEVO: Generar / mantener sismo ---
     JSONObject sismo = new JSONObject();
@@ -148,26 +176,7 @@ class DataProvider {
     }
     currentData.setJSONObject("sismo", sismo);
 
-    // --- NUEVO: Botón de pánico global (simulado) ---
-    JSONObject panicButton = new JSONObject();
-    if (panicButtonCooldown > 0) {
-      panicButtonActive = true;
-      panicButtonCooldown--;
-    } else {
-      // 8% probabilidad de activarlo si no está activo (solo si no se activó manualmente en este ciclo)
-      if (!panicButtonActive && random(1) > 0.92) {
-        panicButtonActive = true;
-        panicButtonCooldown = int(random(1, 3));
-        panicButtonOrigin = "simulado";
-      } else if (panicButtonActive) {
-        // Desactivar si ya no hay cooldown
-        panicButtonActive = false;
-      }
-    }
-    panicButton.setInt("activo", panicButtonActive ? 1 : 0);
-    panicButton.setString("ts", getCurrentTimestamp());
-    panicButton.setString("origen", panicButtonOrigin);
-    currentData.setJSONObject("panic_button", panicButton);
+  // Nota: eliminamos el botón de pánico global. Solo mantenemos los botones individuales (panic_buttons).
 
     // --- NUEVO: Colección de 4 botones de pánico independientes ---
     JSONObject panicButtons = new JSONObject();
@@ -193,26 +202,7 @@ class DataProvider {
     }
     currentData.setJSONObject("panic_buttons", panicButtons);
     
-    // Generar infracciones (lista de paradas con infracciones) - legacy
-    JSONArray infracciones = new JSONArray();
-    for (String paradaId : paradaIds) {
-      if (random(1) > 0.7) { // 30% probabilidad de infracción
-        infracciones.append(paradaId);
-      }
-    }
-    currentData.setJSONArray("infracciones", infracciones);
-
-    // NUEVO: Infracciones detalladas por tipo/calle
-    JSONArray infrDet = new JSONArray();
-    // Simular 0-3 infracciones al azar
-    int n = int(random(0, 3.99));
-    for (int i = 0; i < n; i++) {
-      JSONObject d = new JSONObject();
-      d.setString("tipo", random(1) > 0.5 ? "A" : "B");
-      d.setInt("calle", int(random(1, 3.99))); // 1..3
-      infrDet.append(d);
-    }
-    currentData.setJSONArray("infracciones_detalle", infrDet);
+  // (Se elimina infracciones_detalle: ahora las infracciones se derivan de semáforos)
     
     if (simulationEnabled) {
       lastSource = serialMode && !isSerialTimedOut() ? "simulado_manual" : "simulado";
@@ -263,12 +253,12 @@ class DataProvider {
     }
     sb.append("},\n");
     
-    // Pánico
-    sb.append("  \"panico\": {");
-    JSONObject panico = data.getJSONObject("panico");
-    keys = (String[]) panico.keys().toArray(new String[0]);
+    // Zumbador (antes 'panico')
+    sb.append("  \"zumbador\": {");
+    JSONObject zumb = data.getJSONObject("zumbador");
+    keys = (String[]) zumb.keys().toArray(new String[0]);
     for (int i = 0; i < keys.length; i++) {
-      sb.append("\"").append(keys[i]).append("\":").append(panico.getInt(keys[i]));
+      sb.append("\"").append(keys[i]).append("\":").append(zumb.getInt(keys[i]));
       if (i < keys.length - 1) sb.append(",");
     }
     sb.append("},\n");
@@ -310,8 +300,8 @@ class DataProvider {
     return getCurrentData().getJSONObject("gas_ppm");
   }
   
-  JSONObject getPanicoData() {
-    return getCurrentData().getJSONObject("panico");
+  JSONObject getZumbadorData() {
+    return getCurrentData().getJSONObject("zumbador");
   }
 
   // NUEVO: Acceso a datos de sismo
@@ -319,12 +309,7 @@ class DataProvider {
     return getCurrentData().getJSONObject("sismo");
   }
 
-  // NUEVO: Acceso a botón de pánico global
-  JSONObject getPanicButtonData() {
-    return getCurrentData().getJSONObject("panic_button");
-  }
-
-  // NUEVO: acceso a los 4 botones
+  // Acceso a los 4 botones
   JSONObject getPanicButtonsData() {
     return getCurrentData().getJSONObject("panic_buttons");
   }
@@ -357,28 +342,32 @@ class DataProvider {
 
   // Activar manualmente el botón de pánico (desde UI)
   void triggerPanicButton(String origin) {
-    panicButtonActive = true;
-    panicButtonCooldown = 2; // mantener visible unos ciclos
-    panicButtonOrigin = origin == null ? "manual" : origin;
-    // Forzar actualización inmediata del JSON
+    // Para compatibilidad, cuando se active manualmente actualizamos el primer panic button (PB1)
+    panicButtonCooldown = 2; // mantener visible unos ciclos internamente si es necesario
+    String originVal = origin == null ? "manual" : origin;
     if (simulationEnabled) {
-      // regenerar solo la parte del botón sin tocar otros datos
-      JSONObject pb = new JSONObject();
-      pb.setInt("activo", 1);
-      pb.setString("ts", getCurrentTimestamp());
-      pb.setString("origen", panicButtonOrigin);
-      currentData.setJSONObject("panic_button", pb);
+      // Forzar actualización del estado de PB1
+      JSONObject pb = currentData.hasKey("panic_buttons") ? currentData.getJSONObject("panic_buttons") : new JSONObject();
+      JSONObject btn = new JSONObject();
+      btn.setInt("activo", 1);
+      btn.setString("ts", getCurrentTimestamp());
+      btn.setString("id", "PB1");
+      pb.setJSONObject("PB1", btn);
+      currentData.setJSONObject("panic_buttons", pb);
     }
   }
 
   void resetPanicButton() {
-    panicButtonActive = false;
     panicButtonCooldown = 0;
-    JSONObject pb = new JSONObject();
-    pb.setInt("activo", 0);
-    pb.setString("ts", getCurrentTimestamp());
-    pb.setString("origen", panicButtonOrigin);
-    currentData.setJSONObject("panic_button", pb);
+    if (simulationEnabled) {
+      JSONObject pb = currentData.hasKey("panic_buttons") ? currentData.getJSONObject("panic_buttons") : new JSONObject();
+      JSONObject btn = new JSONObject();
+      btn.setInt("activo", 0);
+      btn.setString("ts", getCurrentTimestamp());
+      btn.setString("id", "PB1");
+      pb.setJSONObject("PB1", btn);
+      currentData.setJSONObject("panic_buttons", pb);
+    }
   }
   
   JSONArray getInfraccionesData() {
@@ -542,24 +531,28 @@ class DataProvider {
       else if (estado.equals("AMARILLO")) amarillosCount++;
     }
     
-    // Contar zonas en pánico (ahora derivadas de botones de pánico activos)
-    int panicoCount = 0;
+    // Contar zonas con zumbador activo (derivado de botones de pánico activos)
+    int zumbadorCount = 0;
     if (data.hasKey("panic_buttons")) {
       try {
         JSONObject pbs = data.getJSONObject("panic_buttons");
         String[] pbKeys = (String[]) pbs.keys().toArray(new String[0]);
         for (int i = 0; i < pbKeys.length; i++) {
           JSONObject btn = pbs.getJSONObject(pbKeys[i]);
-            if (btn.hasKey("activo") && btn.getInt("activo") == 1) panicoCount++;
+            if (btn.hasKey("activo") && btn.getInt("activo") == 1) zumbadorCount++;
         }
       } catch(Exception ex) {
         // Silenciar errores en caso de formato inesperado
       }
     }
     
-    // Contar infracciones
-    JSONArray infracciones = data.getJSONArray("infracciones");
-    int infraccionesCount = infracciones.size();
+    // Contar infracciones: calcular a partir de semáforos (S1..S10) y distancias
+    JSONArray computedInfracciones = computeInfraccionesFromSemaforos(data);
+    int infraccionesCount = computedInfracciones.size();
+    // Exponer el resultado en currentData para compatibilidad visual
+    try {
+      currentData.setJSONArray("infracciones", computedInfracciones);
+    } catch (Exception e) {}
     
     // Calcular promedio de gas
     JSONObject gas = data.getJSONObject("gas_ppm");
@@ -569,8 +562,8 @@ class DataProvider {
     }
     int gasPromedio = gasTotal / zonaIds.length;
     
-    return new TrafficStats(rojosCount, verdesCount, amarillosCount, 
-                           panicoCount, infraccionesCount, gasPromedio);
+  return new TrafficStats(rojosCount, verdesCount, amarillosCount, 
+               zumbadorCount, infraccionesCount, gasPromedio);
   }
 
   // Actualiza los semáforos solo cuando el ciclo se cumple
@@ -602,15 +595,15 @@ class TrafficStats {
   public int semaforosRojos;
   public int semaforosVerdes; 
   public int semaforosAmarillos;
-  public int zonasPanico;
+  public int zonasZumbador;
   public int infracciones;
   public int gasPromedio;
   
-  TrafficStats(int rojos, int verdes, int amarillos, int panico, int infracciones, int gas) {
+  TrafficStats(int rojos, int verdes, int amarillos, int zumbadorCount, int infracciones, int gas) {
     this.semaforosRojos = rojos;
     this.semaforosVerdes = verdes;
     this.semaforosAmarillos = amarillos;
-    this.zonasPanico = panico;
+    this.zonasZumbador = zumbadorCount;
     this.infracciones = infracciones;
     this.gasPromedio = gas;
   }

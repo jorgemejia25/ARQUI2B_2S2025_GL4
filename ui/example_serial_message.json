@@ -1,0 +1,53 @@
+{
+  "ts": "2025-08-22T12:34:56Z",
+  "semaforos": {
+    "S1": "VERDE",
+    "S2": "ROJO",
+    "S3": "VERDE",
+    "S4": "AMARILLO",
+    "S5": "ROJO",
+    "S6": "VERDE",
+    "S7": "AMARILLO",
+    "S8": "VERDE",
+    "S9": "ROJO",
+    "S10": "VERDE"
+  },
+
+  "dist_cm": {
+    "P1": 85,
+    "P2": 40,
+    "P3": 230,
+    "P4": 410,
+    "P5": 30,
+    "P6": 120
+  },
+
+  "gas_ppm": {
+    "Z1": 225,
+    "Z2": 185
+  },
+
+  "zumbador": {
+    "Z1": 0,
+    "Z2": 0
+  },
+
+  "sismo": {
+    "activo": 0,
+    "magnitud": 0.0,
+    "origen": ""
+  },
+
+
+  "panic_buttons": {
+    "PB1": { "activo": 0, "ts": "2025-08-22T12:30:12Z", "id": "PB1" },
+    "PB2": { "activo": 0, "ts": "2025-08-22T12:31:05Z", "id": "PB2" },
+    "PB3": { "activo": 1, "ts": "2025-08-22T12:34:40Z", "id": "PB3" },
+    "PB4": { "activo": 0, "ts": "2025-08-22T12:10:00Z", "id": "PB4" }
+  },
+
+  "infracciones": ["S2", "S5"],
+
+  "_protocol_version": "1.0",
+  "_notes": "Ejemplo realista: Arduino debe enviar un objeto JSON por línea (NDJSON). Campos principales: 'semaforos' (S1..S10), 'dist_cm', 'gas_ppm', 'zumbador', 'sismo', 'panic_buttons' y 'infracciones'. Las 'infracciones' ahora contienen IDs de semáforos (S1..S10). 'activo' es int 0|1 para cada PB."
+}

@@ -24,7 +24,7 @@ class SmokeMonitorScreen extends Screen {
     float cardSpacing = Theme.CARD_WIDTH + 20;
     
     // Tarjetas para cada zona de gas
-    for (int i = 1; i <= 3; i++) {
+  for (int i = 1; i <= 2; i++) {
       String zoneId = "Z" + i;
       InfoCard gasCard = new InfoCard(
         "Gas " + zoneId, 
@@ -93,11 +93,11 @@ class SmokeMonitorScreen extends Screen {
   }
   
   void updatePanicData() {
-    JSONObject panicData = dataProvider.getPanicoData();
+    JSONObject panicData = dataProvider.getZumbadorData();
     
     for (int i = 0; i < panicCards.size(); i++) {
       String zoneId = "Z" + (i + 1);
-      int panicLevel = panicData.getInt(zoneId);
+  int panicLevel = panicData.getInt(zoneId);
       
       InfoCard card = panicCards.get(i);
       String statusText = panicLevel == 1 ? "¡PÁNICO!" : "Normal";
@@ -124,13 +124,13 @@ class SmokeMonitorScreen extends Screen {
   
   void renderAlerts() {
     // Verificar si hay zonas en pánico o gas alto
-    JSONObject panicData = dataProvider.getPanicoData();
+  JSONObject panicData = dataProvider.getZumbadorData();
     JSONObject gasData = dataProvider.getGasData();
     
     boolean hasPanic = false;
     boolean hasHighGas = false;
     
-    for (int i = 1; i <= 3; i++) {
+  for (int i = 1; i <= 2; i++) {
       String zoneId = "Z" + i;
       if (panicData.getInt(zoneId) == 1) hasPanic = true;
       if (gasData.getInt(zoneId) > 250) hasHighGas = true;
@@ -206,7 +206,7 @@ class SmokeMonitorScreen extends Screen {
     TrafficStats stats = dataProvider.getStats();
     fill(Theme.MEDIUM_GRAY);
     textSize(Theme.SMALL_SIZE);
-    text("Zonas en pánico: " + stats.zonasPanico, x + 35, infoY + 32);
+  text("Zonas zumbador: " + stats.zonasZumbador, x + 35, infoY + 32);
     text("Gas promedio: " + stats.gasPromedio + " ppm", x + 35, infoY + 46);
     text("Infracciones: " + stats.infracciones, x + 35, infoY + 60);
     

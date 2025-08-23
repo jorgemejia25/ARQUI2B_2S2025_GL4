@@ -76,29 +76,39 @@ class TrafficScreen extends Screen {
   
   void updateSemaforoCards() {
     JSONObject semaforoData = dataProvider.getSemaforoData();
-    
+    JSONArray infracciones = dataProvider.getInfraccionesData(); // ahora contiene IDs de semáforos (S1..S10)
+
     for (SemaforoCard card : semaforoCards) {
       String estado = semaforoData.getString(card.getId());
       card.setEstado(estado);
+      boolean hasInf = false;
+      for (int i = 0; i < infracciones.size(); i++) {
+        if (infracciones.getString(i).equals(card.getId())) { hasInf = true; break; }
+      }
+      card.setInfraccion(hasInf);
     }
   }
   
   void updateParadaCards() {
     JSONObject distanciaData = dataProvider.getDistanciaData();
-    JSONArray infracciones = dataProvider.getInfraccionesData();
-    
+    JSONArray infracciones = dataProvider.getInfraccionesData(); // contiene semáforo IDs
+
     for (ParadaCard card : paradaCards) {
       int distancia = distanciaData.getInt(card.getId());
       boolean hasInfraction = false;
-      
-      // Verificar infracciones
+
+      // Mapear parada Pn -> semáforo Sn (P1->S1 ... P6->S6)
+      String pid = card.getId();
+      int pnum = int(pid.substring(1));
+      String mappedSem = "S" + pnum;
+
       for (int i = 0; i < infracciones.size(); i++) {
-        if (infracciones.getString(i).equals(card.getId())) {
+        if (infracciones.getString(i).equals(mappedSem)) {
           hasInfraction = true;
           break;
         }
       }
-      
+
       card.setDistancia(distancia);
       card.setInfraccion(hasInfraction);
     }
@@ -140,6 +150,7 @@ class SemaforoCard {
   private String id;
   private float x, y, width, height;
   private String estado = "ROJO";
+  private boolean hasInfraccion = false;
   
   SemaforoCard(String id, float x, float y, float width, float height) {
     this.id = id;
@@ -174,11 +185,22 @@ class SemaforoCard {
     // Estado
     textSize(Theme.TINY_SIZE);
     text(estado, x + width/2, y + height/2 + 20);
+
+    // Indicar infracción (borde rojo prominente)
+    if (hasInfraccion) {
+      stroke(Theme.RED);
+      strokeWeight(3);
+      noFill();
+      rect(x, y, width, height, 5);
+      noStroke();
+    }
   }
   
   void setEstado(String estado) {
     this.estado = estado;
   }
+
+  void setInfraccion(boolean v) { this.hasInfraccion = v; }
   
   String getId() { return id; }
 }

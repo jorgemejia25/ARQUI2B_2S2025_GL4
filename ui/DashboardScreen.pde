@@ -3,8 +3,14 @@
 class DashboardScreen extends Screen {
   private DataProvider dataProvider;
   private ArrayList<InfoCard> summaryCards;
-  private TrafficOverviewChart trafficChart;
+  // Eliminado TrafficOverviewChart
   private Text statusText;
+  // Mini cards adicionales
+  private InfoCard sismoMiniCard;
+  // NUEVO: 4 botones de pánico individuales
+  private ArrayList<InfoCard> panicButtonCards;
+  // Layout refs
+  private float panicRowY;
   
   DashboardScreen(float x, float y, float width, float height, DataProvider dataProvider) {
     super("Dashboard Principal", x, y, width, height);
@@ -15,6 +21,7 @@ class DashboardScreen extends Screen {
   
   void initializeComponents() {
     summaryCards = new ArrayList<InfoCard>();
+  panicButtonCards = new ArrayList<InfoCard>();
     
     // Posicionamiento para tarjetas resumen
     float cardY = y + 80;
@@ -29,22 +36,48 @@ class DashboardScreen extends Screen {
                                            x + 20 + cardSpacing, cardY);
     summaryCards.add(infraccionesCard);
     
-    InfoCard panicoCard = new InfoCard("Zonas Pánico", "0", Theme.RED, 
-                                      x + 20 + cardSpacing * 2, cardY);
-    summaryCards.add(panicoCard);
+  InfoCard zumbadorCard = new InfoCard("Zonas Zumbador", "0", Theme.RED, 
+                    x + 20 + cardSpacing * 2, cardY);
+  summaryCards.add(zumbadorCard);
     
     InfoCard gasCard = new InfoCard("Gas Promedio", "0 ppm", Theme.PRIMARY_BLUE, 
                                    x + 20 + cardSpacing * 3, cardY);
     summaryCards.add(gasCard);
     
-    // Gráfico de vista general del tráfico
-    trafficChart = new TrafficOverviewChart(x + 20, cardY + 160, width - 40, 300, dataProvider);
-    
-    // Texto de estado del sistema
-    statusText = new Text("Sistema Operativo", x + 20, cardY + 480, Theme.GREEN, Theme.LARGE_SIZE);
+  // Mini card solo de sismo debajo de las tarjetas principales
+  float miniY = cardY + Theme.CARD_HEIGHT + 30;
+  sismoMiniCard = new InfoCard("Sismo", "Todo normal", Theme.ORANGE, x + 20, miniY);
+  sismoMiniCard.setSize( (Theme.CARD_WIDTH*1.3), 80);
+
+  // Fila de 4 botones de pánico independientes (más compactos)
+  panicRowY = miniY + 95; // debajo de mini card sismo
+  float panicCardWidth = (width - 40 - 3*18 - 40) / 4; // distribuir mejor (dejando margen lateral extra)
+  for (int i = 0; i < 4; i++) {
+    InfoCard pCard = new InfoCard("P" + (i+1), "Normal", Theme.GREEN, x + 20 + i * (panicCardWidth + 18), panicRowY);
+    pCard.setSize(panicCardWidth, 80);
+    panicButtonCards.add(pCard);
+  }
+
+  // Texto de estado del sistema (ajustado más abajo)
+  statusText = new Text("Sistema Operativo", x + 20, panicRowY + 110, Theme.GREEN, Theme.LARGE_SIZE);
   }
   
   void renderContent() {
+    // Shake visual si hay sismo activo
+    boolean shaking = false;
+    float dx = 0, dy = 0;
+    try {
+      JSONObject sismo = dataProvider.getSismoData();
+      if (sismo.getInt("activo") == 1) {
+        float mag = max(3, min(7, sismo.getFloat("magnitud")));
+        float amp = map(mag, 3, 7, 1, 6);
+        dx = random(-amp, amp);
+        dy = random(-amp, amp);
+        shaking = true;
+      }
+    } catch(Exception e) {}
+    if (shaking) pushMatrix();
+    if (shaking) translate(dx, dy);
     // Actualizar datos
     updateSummaryCards();
     
@@ -52,24 +85,133 @@ class DashboardScreen extends Screen {
     for (InfoCard card : summaryCards) {
       card.render();
     }
-    
-    // Renderizar gráfico
-    trafficChart.render();
+  // Actualizar y render mini cards
+  updateMiniCards();
+  sismoMiniCard.render();
+    // Render panic buttons (estilo custom)
+    updatePanicButtonsCards();
+    renderPanicButtonsRow();
     
     // Estado del sistema
     renderSystemStatus();
     
     // Información de tiempo real
     renderRealTimeInfo();
+
+  // Panel de alertas (sismos y botón de pánico)
+  renderAlertsPanel();
+    if (shaking) popMatrix();
   }
+
+  // Manejo de clic (ya no hay acciones de envío; pantalla solo visual)
+  void handleMousePressed(float mx, float my) { }
   
   void updateSummaryCards() {
     TrafficStats stats = dataProvider.getStats();
     
     summaryCards.get(0).updateValue(str(stats.semaforosVerdes));
     summaryCards.get(1).updateValue(str(stats.infracciones));
-    summaryCards.get(2).updateValue(str(stats.zonasPanico));
+  summaryCards.get(2).updateValue(str(stats.zonasZumbador));
     summaryCards.get(3).updateValue(stats.gasPromedio + " ppm");
+  }
+  
+  void updateMiniCards() {
+    // Sismo
+    JSONObject sismo = dataProvider.getSismoData();
+    boolean activo = sismo.getInt("activo") == 1;
+    if (activo) {
+      float mag = sismo.getFloat("magnitud");
+      String origen = sismo.hasKey("origen") ? sismo.getString("origen") : "";
+      sismoMiniCard.updateValue("M" + nf(mag,1,1) + " (" + origen + ")");
+    } else {
+      sismoMiniCard.updateValue("Todo normal");
+    }
+  // (Se elimina el mini card de pánico global)
+  }
+
+  // NUEVO: actualizar estado de los 4 botones
+  void updatePanicButtonsCards() {
+    JSONObject buttons = dataProvider.getPanicButtonsData();
+    for (int i = 0; i < panicButtonCards.size(); i++) {
+      InfoCard c = panicButtonCards.get(i);
+      String id = "PB" + (i+1);
+      if (buttons.hasKey(id)) {
+        JSONObject btn = buttons.getJSONObject(id);
+        int act = btn.getInt("activo");
+        if (act == 1) {
+          c.updateValue("Activado");
+          c.cardColor = Theme.RED;
+          c.valueText.setColor(Theme.RED);
+        } else {
+          c.updateValue("Normal");
+          c.cardColor = Theme.GREEN;
+          c.valueText.setColor(Theme.GREEN);
+        }
+      }
+    }
+  }
+
+  // NUEVO: renderizado visual mejorado para los 4 botones de pánico
+  void renderPanicButtonsRow() {
+    textAlign(LEFT, TOP);
+    for (int i = 0; i < panicButtonCards.size(); i++) {
+      InfoCard c = panicButtonCards.get(i);
+      float cx = c.x;
+      float cy = c.y;
+      float cw = c.width;
+      float ch = c.height;
+      boolean active = c.cardColor == Theme.RED;
+
+      // Sombra
+      drawSoftShadow(cx, cy, cw, ch, 2);
+
+      // Fondo (gradiente simple simulado con dos capas)
+      noStroke();
+      if (active) {
+        // Capa base roja oscura
+        fill(230,60,60); rect(cx, cy, cw, ch, 14);
+        // Capa superior translúcida para brillo
+        fill(255,255,255,35); rect(cx, cy, cw, ch*0.55, 14,14,0,0);
+      } else {
+        fill(255); rect(cx, cy, cw, ch, 14);
+        fill(0,0,0,10); rect(cx, cy, cw, ch*0.45, 14,14,0,0);
+      }
+
+      // Borde
+      stroke(active ? color(255,90,90) : color(220));
+      strokeWeight(active ? 2 : 1);
+      noFill();
+      rect(cx, cy, cw, ch, 14);
+      noStroke();
+
+      // Título (arriba)
+      fill(active ? 255 : 60);
+  textSize(11); // título más pequeño
+  text(c.title, cx + 10, cy + 8);
+
+      // Icono central
+      float iconY = cy + ch/2 - 4;
+      float iconX = cx + cw/2;
+      if (active) {
+        float pulse = 1 + (sin(millis()*0.025f)+1)*0.4f; // pulso más sutil
+        fill(255,90,90,90); ellipse(iconX, iconY, 38*pulse, 38*pulse);
+        fill(255); ellipse(iconX, iconY, 26,26);
+        fill(230,60,60); textAlign(CENTER, CENTER); textSize(14); text("!", iconX, iconY+1);
+      } else {
+        fill(242); ellipse(iconX, iconY, 30,30);
+        fill(100); textAlign(CENTER, CENTER); textSize(11); text("PB", iconX, iconY+1);
+      }
+
+      // Estado (abajo)
+  textAlign(CENTER, TOP);
+  textSize(active ? 13 : 11);
+  fill(active ? 255 : 80);
+  text(c.value, iconX, cy + ch - 26);
+  // Sub-etiqueta
+  textSize(9);
+  fill(active ? 255 : 140);
+  text(active ? "Botón" : "Disponible", iconX, cy + ch - 14);
+    }
   }
   
   void renderSystemStatus() {
@@ -79,7 +221,7 @@ class DashboardScreen extends Screen {
     String systemStatus = "Sistema Operativo";
     color statusColor = Theme.GREEN;
     
-    if (stats.zonasPanico > 0 || stats.gasPromedio > 250) {
+  if (stats.zonasZumbador > 0 || stats.gasPromedio > 250) {
       systemStatus = "¡EMERGENCIA ACTIVA!";
       statusColor = Theme.RED;
     } else if (stats.infracciones > 3 || stats.gasPromedio > 200) {
@@ -93,8 +235,8 @@ class DashboardScreen extends Screen {
   }
   
   void renderRealTimeInfo() {
-    // Panel de información en tiempo real
-    float infoY = y + height - 100;
+  // Panel de información en tiempo real (subido para no chocar con borde)
+  float infoY = y + height - 110; // pequeño ajuste
     
     drawSoftShadow(x + 20, infoY, width - 40, 80, 2);
     fill(Theme.WHITE);
@@ -118,7 +260,7 @@ class DashboardScreen extends Screen {
                       stats.semaforosAmarillos + " amarillos";
     text(infoLine1, x + 35, infoY + 40);
     
-    String infoLine2 = "Monitoreo: " + stats.zonasPanico + " zonas pánico, " + 
+  String infoLine2 = "Monitoreo: " + stats.zonasZumbador + " zonas zumbador, " + 
                       stats.infracciones + " infracciones, " + 
                       "Gas: " + stats.gasPromedio + " ppm";
     text(infoLine2, x + 35, infoY + 55);
@@ -129,153 +271,74 @@ class DashboardScreen extends Screen {
     text("Última actualización: " + currentData.getString("ts"), 
          x + width - 25, infoY + 40);
   }
-}
 
-// Clase para gráfico de vista general del tráfico
-class TrafficOverviewChart {
-  float x, y, width, height;
-  DataProvider dataProvider;
-  Text titleText;
-  
-  TrafficOverviewChart(float x, float y, float width, float height, DataProvider dataProvider) {
-    this.x = x;
-    this.y = y;
-    this.width = width;
-    this.height = height;
-    this.dataProvider = dataProvider;
-    
-    titleText = new Text("Vista General del Tráfico", x + 20, y + 20, Theme.DARK_GRAY, Theme.NORMAL_SIZE);
-  }
-  
-  void render() {
-    // Fondo del gráfico
-    drawSoftShadow(x, y, width, height, 2);
-    fill(Theme.WHITE);
-    noStroke();
-    rect(x, y, width, height, 5);
-    
-    titleText.render();
-    
-    // Dibujar gráfico de barras para semáforos
-    drawSemaphorosChart();
-    
-    // Dibujar estado de las paradas
-    drawParadasStatus();
-  }
-  
-  void drawSemaphorosChart() {
-    TrafficStats stats = dataProvider.getStats();
-    
-    float chartX = x + 40;
-    float chartY = y + 60;
-    float chartWidth = (width - 100) / 2;
-    float chartHeight = height - 120;
-    
-    // Título del gráfico de semáforos
-    fill(Theme.DARK_GRAY);
-    textAlign(LEFT, TOP);
-    textSize(Theme.SMALL_SIZE);
-    text("Estados de Semáforos", chartX, chartY - 10);
-    
-    // Datos para las barras
-    int[] values = {stats.semaforosRojos, stats.semaforosVerdes, stats.semaforosAmarillos};
-    color[] colors = {Theme.RED, Theme.GREEN, Theme.ORANGE};
-    String[] labels = {"Rojo", "Verde", "Amarillo"};
-    
-    float barWidth = chartWidth / 3 - 20;
-    int maxValue = max(max(values), 1);
-    
-    for (int i = 0; i < 3; i++) {
-      float barHeight = map(values[i], 0, maxValue, 0, chartHeight - 40);
-      float barX = chartX + i * (barWidth + 20);
-      float barY = chartY + chartHeight - 40 - barHeight;
-      
-      // Dibujar barra
-      fill(colors[i]);
-      noStroke();
-      rect(barX, barY, barWidth, barHeight, 3);
-      
-      // Valor en la barra
-      fill(Theme.WHITE);
-      textAlign(CENTER, CENTER);
-      textSize(Theme.NORMAL_SIZE);
-      if (barHeight > 20) {
-        text(str(values[i]), barX + barWidth/2, barY + barHeight/2);
-      }
-      
-      // Etiqueta
-      fill(Theme.DARK_GRAY);
-      textAlign(CENTER, TOP);
-      textSize(Theme.SMALL_SIZE);
-      text(labels[i], barX + barWidth/2, chartY + chartHeight - 35);
+  // --- Panel de Alertas ---
+  void renderAlertsPanel() {
+  // Posicionar fila de alertas: debajo de los botones de pánico con nuevo layout
+  float baseY = panicRowY + 80 + 30; // altura botón (80) + margen
+  // Evitar que se acerque demasiado al panel de info realtime
+  float minGapBottom = 140; // espacio necesario para info realtime + margen
+  float maxYForAlerts = y + height - minGapBottom;
+  if (baseY > maxYForAlerts) baseY = maxYForAlerts;
+  // Si el espacio es muy reducido, reducir altura de cada card
+  JSONObject sismo = dataProvider.getSismoData();
+  JSONObject zumbador = dataProvider.getZumbadorData();
+
+    boolean sismoActivo = sismo.getInt("activo") == 1;
+    float magnitud = sismo.getFloat("magnitud");
+  // (Se omite listado de zonas afectadas: la fila de botones ya lo representa)
+  // Construir mensajes (cada uno será una card) solo sismo u otros futuros
+    ArrayList<String> alerts = new ArrayList<String>();
+  if (sismoActivo) alerts.add("SISMO M" + nf(magnitud,1,1));
+    if (alerts.size() == 0) alerts.add("Sin alertas");
+    // Si solo hay 'Sin alertas' no dibujar panel para limpiar el espacio
+    if (alerts.size() == 1 && alerts.get(0).startsWith("Sin")) {
+      return;
     }
-  }
-  
-  void drawParadasStatus() {
-    JSONObject distancias = dataProvider.getDistanciaData();
-    JSONArray infracciones = dataProvider.getInfraccionesData();
-    
-    float chartX = x + width/2 + 20;
-    float chartY = y + 60;
-    float chartWidth = width/2 - 60;
-    float chartHeight = height - 120;
-    
-    // Título
-    fill(Theme.DARK_GRAY);
+
+    int cardCount = alerts.size();
+    float totalWidth = width - 40;
+    float gap = 15;
+    float cardWidth = (totalWidth - gap * (cardCount - 1)) / cardCount;
+    float cardHeight = 80;
+    if (baseY + cardHeight > y + height - 120) {
+      cardHeight = max(60, (y + height - 120) - baseY);
+    }
+    float startX = x + 20;
+
     textAlign(LEFT, TOP);
-    textSize(Theme.SMALL_SIZE);
-    text("Estado de Paradas", chartX, chartY - 10);
-    
-    // Dibujar representación de paradas
-    int rows = 2;
-    int cols = 3;
-    float cellWidth = chartWidth / cols - 10;
-    float cellHeight = (chartHeight - 40) / rows - 10;
-    
-    for (int i = 1; i <= 6; i++) {
-      String paradaId = "P" + i;
-      int row = (i - 1) / cols;
-      int col = (i - 1) % cols;
-      
-      float cellX = chartX + col * (cellWidth + 10);
-      float cellY = chartY + row * (cellHeight + 10);
-      
-      // Determinar color según estado
-      color cellColor = Theme.GREEN; // Normal
-      boolean hasInfraction = false;
-      
-      // Verificar si tiene infracción
-      for (int j = 0; j < infracciones.size(); j++) {
-        if (infracciones.getString(j).equals(paradaId)) {
-          hasInfraction = true;
-          break;
-        }
-      }
-      
-      if (hasInfraction) {
-        cellColor = Theme.RED;
-      } else {
-        int distancia = distancias.getInt(paradaId);
-        if (distancia < 50) {
-          cellColor = Theme.ORANGE; // Muy cerca
-        }
-      }
-      
-      // Dibujar celda
-      fill(cellColor);
-      noStroke();
-      rect(cellX, cellY, cellWidth, cellHeight, 5);
-      
-      // Texto de la parada
+    textSize(12);
+
+    for (int i = 0; i < cardCount; i++) {
+      String msg = alerts.get(i);
+      color baseColor = Theme.GREEN;
+      if (msg.startsWith("SISMO")) baseColor = Theme.ORANGE;
+  // (sin card de zonas)
+      if (msg.startsWith("Sin")) baseColor = Theme.MEDIUM_GRAY;
+
+      float cx = startX + i * (cardWidth + gap);
+      // Sombra
+      drawSoftShadow(cx, baseY, cardWidth, cardHeight, 2);
+      // Card fondo
       fill(Theme.WHITE);
-      textAlign(CENTER, CENTER);
-      textSize(Theme.SMALL_SIZE);
-      text(paradaId, cellX + cellWidth/2, cellY + cellHeight/2 - 5);
-      
-      // Distancia
-      int distancia = distancias.getInt(paradaId);
-      textSize(Theme.TINY_SIZE);
-      text(distancia + "cm", cellX + cellWidth/2, cellY + cellHeight/2 + 8);
+      noStroke();
+  rect(cx, baseY, cardWidth, cardHeight, 6);
+      // Banda superior
+      fill(baseColor);
+      rect(cx, baseY, cardWidth, 8, 6,6,0,0);
+      // Contenido
+      fill(baseColor);
+      textSize(14);
+  float contentTop = baseY + 14;
+  text(msg, cx + 12, contentTop);
+
+      // Detalle adicional si aplica
+      fill(Theme.DARK_GRAY);
+      textSize(11);
+      float lineY = contentTop + 24;
+      if (msg.startsWith("SISMO") && sismoActivo) {
+        text("Magnitud estable", cx + 12, lineY);
+      }
     }
   }
 }

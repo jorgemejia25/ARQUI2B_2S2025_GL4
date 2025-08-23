@@ -17,14 +17,13 @@ class SideBar {
   
   private void initializeMenu() {
     menuItems = new ArrayList<MenuItem>();
-    
-    // Opciones del menú principal correspondientes a las pantallas
+      // Opciones del menú principal correspondientes a las pantallas
     String[] menuLabels = {
       "Dashboard", 
       "Monitoreo Humo", 
-
+      "Semáforos",
+      "Tráfico", 
       "Configuración"
-
     };
     
     float itemHeight = 50;

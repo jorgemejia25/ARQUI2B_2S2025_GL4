@@ -64,4 +64,8 @@ class Button {
     this.w = w;
     this.h = h;
   }
+
+  void setLabel(String lbl) {
+    this.label = lbl;
+  }
 }

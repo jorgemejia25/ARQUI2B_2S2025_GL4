@@ -20,10 +20,11 @@ class SideBar {
       // Opciones del menú principal correspondientes a las pantallas
     String[] menuLabels = {
       "Dashboard", 
-      "Monitoreo Humo", 
+      "Incendios", 
       "Semáforos",
-      "Tráfico", 
-      "Configuración"
+      "Distancias",
+      "Mapa",
+      "Configuración" 
     };
     
     float itemHeight = 50;

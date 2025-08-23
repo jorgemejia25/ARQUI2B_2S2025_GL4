@@ -1,25 +1,26 @@
 /*
   Ciudad – sensores (Transmetro + Transurbano + SD cruces)
   Serial 115200:
-    - Paradas: TM,ARRIVE/LEAVE,<1|2>  |  TU,ARRIVE/LEAVE,<1|2>
-    - ETA fijo: TM,ETA_S,FROM=x,TO=y,<seg> | TU,ETA_S,FROM=x,TO=y,<seg>
-    - Infracciones: INFRACCION ROJO SDn, cm=...
+    Eventos (texto):
+      - Paradas: TM,ARRIVE/LEAVE,<1|2>  |  TU,ARRIVE/LEAVE,<1|2>
+      - ETA fijo: TM,ETA_S,FROM=x,TO=y,<seg> | TU,ETA_S,FROM=x,TO=y,<seg>
+      - Infracciones: INFRACCION ROJO SDn, cm=...
+      - Botones: BTN,BUZx,PRESS
+    Estado periódico (NDJSON puro):
+      - { "ts": "...", "semaforos": {...}, "dist_cm": {...}, "gas_ppm": {...}, "zumbador": {...},
+          "sismo": {...}, "panic_buttons": {...}, "infracciones": [...], "_protocol_version":"1.0" }
 */
-
 
 #include <Arduino.h>
 
-
 // ===== Depuración =====
-#define DEBUG_STOPS 0           // 0 para apagar depuración de TM1/TM2/TU3/TU4
+#define DEBUG_STOPS 0
 const uint16_t DEBUG_STOPS_MS = 250;
-
 
 // ---------- Incendios ----------
 #define PIN_AO  A0
 #define PIN_A1  A1
 const int HUMO_UMBRAL = 500;
-
 
 // ---------- Sensores ----------
 enum {
@@ -30,36 +31,30 @@ enum {
 const uint8_t N_SENSORS = 9;
 const uint8_t UNUSED_PIN = 255;
 
-
-// Pines TRIG/ECHO (AJUSTA SD1..SD4 a tus pines reales si no usas A8..A15)
 struct UPin { uint8_t trig, echo; };
 const UPin US_PINS[N_SENSORS] = {
   {22,23},   // TM1
   {24,25},   // TM2
-  {7,6},   // TU3
+  {7,6},     // TU3
   {32,33},   // TU4
-  {46, 47},  // SD1  
-  {48,49}, // SD2  
-  {50,51}, // SD3  
-  {52,53}, // SD4 
-  {26,27}    // SD5  (confirmado)
+  {46,47},   // SD1
+  {48,49},   // SD2
+  {50,51},   // SD3
+  {52,53},   // SD4
+  {26,27}    // SD5
 };
-
 
 // ---------- Parámetros ----------
 const float  THR_STOP_CM   = 6.0f;
 const uint32_t STABLE_MS   = 3000UL;
 const unsigned long ECHO_TIMEOUT_US = 20000UL;
 
-
 // ---------- Estado genérico ----------
 bool     wasBelow[N_SENSORS]       = {0};
 bool     stableReported[N_SENSORS] = {0};
 uint32_t belowStartMs[N_SENSORS]   = {0};
 float    lastCm[N_SENSORS]         = {0};
-bool stopETAArmed[N_SENSORS] = {0};   // Se arma al llegar (3s <5 cm) y se consume al salir
-
-
+bool     stopETAArmed[N_SENSORS]   = {0}; // disponible si decides mover ETA al loop
 
 // =====================================================
 // BUZZERS y BOTONES
@@ -70,195 +65,78 @@ const uint8_t BUZ3_PIN    = 2;   // BUZ3
 const uint8_t BUZ4_PIN    = 3;   // BUZ4
 const uint16_t BUZZ_MS    = 500;
 
-
 uint32_t buz1Until = 0, buz2Until = 0, buz3Until = 0, buz4Until = 0;
 
-// Estado para panic_buttons (PB1..PB4) - se activa al detectar el botón y expira
-bool panicButtonsActiveState[4] = {false, false, false, false};
-uint32_t panicButtonsUntil[4] = {0,0,0,0};
-
-// Emisión periódica de JSON
-uint32_t lastEmitMs = 0;
-const uint32_t EMIT_MS = 2000;
-
-
-inline void buzzPin(uint8_t pin){
-  if (pin==BUZ_TU1_PIN) { digitalWrite(BUZ_TU1_PIN, HIGH); buz1Until = millis() + BUZZ_MS; }
-  else if (pin==BUZ_TU2_PIN) { digitalWrite(BUZ_TU2_PIN, HIGH); buz2Until = millis() + BUZZ_MS; }
-  else if (pin==BUZ3_PIN) { buz3Until = millis() + BUZZ_MS; }
-  else if (pin==BUZ4_PIN) { buz4Until = millis() + BUZZ_MS; }
-}
-void updateBuzzers(){
-  uint32_t now = millis();
-  if (buz1Until && now >= buz1Until){ digitalWrite(BUZ_TU1_PIN, LOW); buz1Until = 0; }
-  if (buz2Until && now >= buz2Until){ digitalWrite(BUZ_TU2_PIN, LOW); buz2Until = 0; }
-  // BUZ3/BUZ4 se controlan más abajo con OR (botón/incendio/temporizador)
-}
-
-// Semáforos: tiempos y estado global
-const uint32_t T_GREEN  = 10000UL;
-const uint32_t T_YELLOW = 2000UL;
-
-enum Phase : uint8_t { P_A_GREEN, P_A_YELLOW, P_B_GREEN, P_B_YELLOW };
-Phase phase = P_A_GREEN;
-uint32_t phaseSince = 0;
-
-// Devuelve estado textual del grupo A/B para cada semáforo (S1..S10)
-const char* stateForIndex(int idx){
-  // idx: 0..9
-  switch(phase){
-    case P_A_GREEN:
-    case P_A_YELLOW:
-      // A está en verde/yellow fases
-      if (idx < 5) {
-        if (phase==P_A_GREEN) return "VERDE"; else return "AMARILLO";
-      } else {
-        return "ROJO";
-      }
-    case P_B_GREEN:
-    case P_B_YELLOW:
-      if (idx < 5) return "ROJO";
-      else { if (phase==P_B_GREEN) return "VERDE"; else return "AMARILLO"; }
-  }
-  return "ROJO";
-}
-
-void emitStatusJson(){
-  // Construir JSON en una sola línea, consistente con ui/example_serial_message.json
-  Serial.print('{');
-  // ts
-  Serial.print("\"ts\":\""); Serial.print(millis()); Serial.print("\",");
-
-  // semaforos
-  Serial.print("\"semaforos\":{");
-  for (int i=0;i<10;i++){
-    Serial.print('"'); Serial.print('S'); Serial.print(i+1); Serial.print('"'); Serial.print(':');
-    Serial.print('"'); Serial.print(stateForIndex(i)); Serial.print('"');
-    if (i<9) Serial.print(',');
-  }
-  Serial.print("},");
-
-  // dist_cm: P1..P6
-  Serial.print("\"dist_cm\":{");
-  for (int i=0;i<6;i++){
-    Serial.print('"'); Serial.print('P'); Serial.print(i+1); Serial.print('"'); Serial.print(':');
-    int d = (int)round(lastCm[i]);
-    Serial.print(d);
-    if (i<5) Serial.print(',');
-  }
-  Serial.print("},");
-
-  // gas_ppm: send placeholders from analog
-  int gas1 = map(constrain(analogRead(PIN_AO),0,1023),0,1023,150,300);
-  int gas2 = map(constrain(analogRead(PIN_A1),0,1023),0,1023,150,300);
-  Serial.print("\"gas_ppm\":{"); Serial.print("\"Z1\":"); Serial.print(gas1); Serial.print(','); Serial.print("\"Z2\":"); Serial.print(gas2); Serial.print("},");
-
-  // zumbador: placeholders
-  int z1 = 0; int z2 = 0;
-  Serial.print("\"zumbador\":{"); Serial.print("\"Z1\":"); Serial.print(z1); Serial.print(','); Serial.print("\"Z2\":"); Serial.print(z2); Serial.print("},");
-
-  // sismo
-  Serial.print("\"sismo\":{"); Serial.print("\"activo\":"); Serial.print(0); Serial.print(','); Serial.print("\"magnitud\":0.0,\"origen\":\"\"},");
-
-  // panic_buttons
-  Serial.print("\"panic_buttons\":{");
-  for (int i=0;i<4;i++){
-    Serial.print('"'); Serial.print('P'); Serial.print('B'); Serial.print(i+1); Serial.print('"'); Serial.print(':');
-    Serial.print('{');
-    Serial.print("\"activo\":"); Serial.print(panicButtonsActiveState[i] ? 1 : 0); Serial.print(',');
-    Serial.print("\"ts\":\""); Serial.print(millis()); Serial.print("\""); Serial.print(',');
-    Serial.print("\"id\":\""); Serial.print("PB"); Serial.print(i+1); Serial.print("\"");
-    Serial.print('}');
-    if (i<3) Serial.print(',');
-  }
-  Serial.print("},");
-
-  // infracciones: derive quickly using same logic as UI (map S1..S10 to P1..P6)
-  Serial.print("\"infracciones\":[");
-  bool first=true;
-  int umbral = 50;
-  for (int i=0;i<10;i++){
-    int pidx = i % 6; // map to P1..P6
-    int d = (int)round(lastCm[pidx]);
-    const char* st = stateForIndex(i);
-    if (strcmp(st,"ROJO")==0 && d < umbral){
-      if (!first) Serial.print(',');
-      Serial.print('"'); Serial.print('S'); Serial.print(i+1); Serial.print('"');
-      first=false;
-    }
-  }
-  Serial.print("],");
-
-  // End JSON
-  Serial.print("\"_protocol_version\":\"1.0\"}");
-  Serial.println();
-}
-
-
-// Botones manuales
 const uint8_t BTN_BUZ1_PIN = 38;
 const uint8_t BTN_BUZ2_PIN = 39;
 const uint8_t BTN_BUZ3_PIN = 4;
 const uint8_t BTN_BUZ4_PIN = 5;
 const uint16_t BTN_DEBOUNCE_MS = 150;
-bool btn1Last = HIGH, btn2Last = HIGH;
-uint32_t btn1ChangeMs = 0, btn2ChangeMs = 0;
-bool btn3Last = HIGH, btn4Last = HIGH;
-uint32_t btn3ChangeMs = 0, btn4ChangeMs = 0;
+bool btn1Last = HIGH, btn2Last = HIGH, btn3Last = HIGH, btn4Last = HIGH;
+uint32_t btn1ChangeMs = 0, btn2ChangeMs = 0, btn3ChangeMs = 0, btn4ChangeMs = 0;
 
+// Estado “activo” para reflejarlo en STATUS (~3 s)
+bool buttonsActive[4] = {false,false,false,false};
+uint32_t buttonsUntil[4] = {0,0,0,0};
 
+inline void buzzPin(uint8_t pin){
+  uint32_t now = millis();
+  if (pin==BUZ_TU1_PIN) { digitalWrite(BUZ_TU1_PIN, HIGH); buz1Until = now + BUZZ_MS; }
+  else if (pin==BUZ_TU2_PIN) { digitalWrite(BUZ_TU2_PIN, HIGH); buz2Until = now + BUZZ_MS; }
+  else if (pin==BUZ3_PIN) { buz3Until = now + BUZZ_MS; }
+  else if (pin==BUZ4_PIN) { buz4Until = now + BUZZ_MS; }
+}
+void updateBuzzers(){
+  uint32_t now = millis();
+  if (buz1Until && now >= buz1Until){ digitalWrite(BUZ_TU1_PIN, LOW); buz1Until = 0; }
+  if (buz2Until && now >= buz2Until){ digitalWrite(BUZ_TU2_PIN, LOW); buz2Until = 0; }
+  // BUZ3/BUZ4 se mezclan con alarmas de incendio más abajo
+}
+
+inline void markButtonActive(uint8_t idx){
+  buttonsActive[idx] = true;
+  buttonsUntil[idx] = millis() + 3000; // visible 3 s
+}
 
 inline void readButtonsAndTrigger(){
   uint32_t now = millis();
 
-
-  // --- BTN BUZ1 ---
   bool b1 = digitalRead(BTN_BUZ1_PIN);
   if (b1 != btn1Last){ btn1Last = b1; btn1ChangeMs = now; }
   else if (b1 == LOW && (now - btn1ChangeMs) >= BTN_DEBOUNCE_MS){
-  // activar PB1 para UI
-  panicButtonsActiveState[0] = true;
-  panicButtonsUntil[0] = now + 3000; // mantener 3s
-  // Serial.println("BTN,BUZ1,PRESS");
+    Serial.println("BTN,BUZ1,PRESS");
     buzzPin(BUZ_TU1_PIN);
-    btn1ChangeMs = now + 1000; // anti-repetición
+    markButtonActive(0);
+    btn1ChangeMs = now + 1000;
   }
 
-
-  // --- BTN BUZ2 ---
   bool b2 = digitalRead(BTN_BUZ2_PIN);
   if (b2 != btn2Last){ btn2Last = b2; btn2ChangeMs = now; }
   else if (b2 == LOW && (now - btn2ChangeMs) >= BTN_DEBOUNCE_MS){
-  panicButtonsActiveState[1] = true;
-  panicButtonsUntil[1] = now + 3000;
+    Serial.println("BTN,BUZ2,PRESS");
     buzzPin(BUZ_TU2_PIN);
+    markButtonActive(1);
     btn2ChangeMs = now + 1000;
   }
 
-
-  // --- BTN BUZ3 ---
   bool b3 = digitalRead(BTN_BUZ3_PIN);
   if (b3 != btn3Last){ btn3Last = b3; btn3ChangeMs = now; }
   else if (b3 == LOW && (now - btn3ChangeMs) >= BTN_DEBOUNCE_MS){
-  panicButtonsActiveState[2] = true;
-  panicButtonsUntil[2] = now + 3000;
-    buzzPin(BUZ3_PIN);           // usa tu mismo pulso temporizado
-    btn3ChangeMs = now + 1000;   // anti-repetición
+    Serial.println("BTN,BUZ3,PRESS");
+    buzzPin(BUZ3_PIN);
+    markButtonActive(2);
+    btn3ChangeMs = now + 1000;
   }
 
-
-  // --- BTN BUZ4 ---
   bool b4 = digitalRead(BTN_BUZ4_PIN);
   if (b4 != btn4Last){ btn4Last = b4; btn4ChangeMs = now; }
   else if (b4 == LOW && (now - btn4ChangeMs) >= BTN_DEBOUNCE_MS){
-  panicButtonsActiveState[3] = true;
-  panicButtonsUntil[3] = now + 3000;
+    Serial.println("BTN,BUZ4,PRESS");
     buzzPin(BUZ4_PIN);
+    markButtonActive(3);
     btn4ChangeMs = now + 1000;
   }
 }
-
-
 
 // =====================================================
 // Ultrasonido
@@ -277,21 +155,16 @@ float readUltrasonicCm(uint8_t id) {
 }
 inline float thrFor(uint8_t id){
   if (id==TM1 || id==TM2 || id==TU3 || id==TU4) return THR_STOP_CM;
-  return 9999.0f; // SDx no usan esta lógica
+  return 9999.0f;
 }
-
 
 // =====================================================
 // Paradas (ARRIVE/LEAVE) + ETA fijo
 // =====================================================
-// Constantes de ETA fijas
 const float    TU_SPEED_CM_S = 10.0f;
 const uint16_t TU_D12_CM     = 105;   // 1 <-> 2
-
-
 const float    TM_SPEED_CM_S = 10.0f;
 const uint16_t TM_D12_CM     = 154;   // 1 <-> 2
-
 
 static inline void publishETA_TU(uint8_t fromStop, uint8_t toStop){
   float t_s = (float)TU_D12_CM / max(1.0f, TU_SPEED_CM_S);
@@ -305,8 +178,6 @@ static inline void publishETA_TM(uint8_t fromStop, uint8_t toStop){
   Serial.print(",TO="); Serial.print(toStop);
   Serial.print(","); Serial.println(t_s, 2);
 }
-
-
 static inline void TM_onArrive(uint8_t stopId){
   Serial.print("TM,ARRIVE,"); Serial.println(stopId==TM1?1:2);
 }
@@ -314,7 +185,7 @@ static inline void TM_onLeave(uint8_t stopId){
   uint8_t from = (stopId==TM1)?1:2;
   uint8_t to   = (stopId==TM1)?2:1;
   Serial.print("TM,LEAVE,");  Serial.println(from);
-  publishETA_TM(from, to);                // ETA fijo al salir
+  publishETA_TM(from, to); // si prefieres mover ETA al loop, comenta esta línea
 }
 static inline void TU_onArriveStop(uint8_t stopNum){
   Serial.print("TU,ARRIVE,"); Serial.println(stopNum);
@@ -323,11 +194,10 @@ static inline void TU_onLeaveStop(uint8_t stopNum){
   uint8_t from = stopNum;
   uint8_t to   = (stopNum==1)?2:1;
   Serial.print("TU,LEAVE,");  Serial.println(from);
-  publishETA_TU(from, to);                // ETA fijo al salir
+  publishETA_TU(from, to);
 }
 
-
-// ===== Depuración de paradas (distancias) =====
+// ===== Depuración de paradas =====
 #if DEBUG_STOPS
 static uint32_t dbgStopTs[4] = {0,0,0,0};
 inline void debugStopDistances(){
@@ -341,23 +211,27 @@ inline void debugStopDistances(){
 inline void debugStopDistances() {}
 #endif
 
-
 // =====================================================
-// Semáforos
+// Semáforos (salidas físicas)
 // =====================================================
 const uint8_t A_R = 40, A_Y = 7, A_G = 42;
 const uint8_t B_R = 43, B_Y = 44, B_G = 45;
-
-
 const uint8_t A_R2 = 8,  A_Y2 = 9,  A_G2 = 10;
 const uint8_t B_R2 = 11, B_Y2 = 12, B_G2 = 13;
 
+const uint32_t T_GREEN  = 10000UL;
+const uint32_t T_YELLOW = 2000UL;
+
+enum Phase : uint8_t { P_A_GREEN, P_A_YELLOW, P_B_GREEN, P_B_YELLOW };
+Phase phase = P_A_GREEN;
+uint32_t phaseSince = 0;
 
 void applyLights(){
+  // HARDWARE físico
   digitalWrite(A_R, LOW);  digitalWrite(A_Y, LOW);  digitalWrite(A_G, LOW);
   digitalWrite(B_R, LOW);  digitalWrite(B_Y, LOW);  digitalWrite(B_G, LOW);
   digitalWrite(A_R2, LOW); digitalWrite(A_Y2, LOW); digitalWrite(A_G2, LOW);
-
+  digitalWrite(B_R2, LOW); digitalWrite(B_Y2, LOW); digitalWrite(B_G2, LOW);
 
   switch (phase){
     case P_A_GREEN:  digitalWrite(A_G, HIGH);  digitalWrite(A_G2, HIGH);  digitalWrite(B_R, HIGH);  digitalWrite(B_R2, HIGH); break;
@@ -373,106 +247,79 @@ void nextPhase(){
     case P_B_GREEN:  phase = P_B_YELLOW; break;
     case P_B_YELLOW: phase = P_A_GREEN;  break;
   }
-  phaseSince = millis();
-  applyLights();
+  phaseSince = millis(); applyLights();
 }
-
 void updateTrafficLights(){
   uint32_t now = millis();
   switch(phase){
     case P_A_GREEN:
-    case P_B_GREEN:
-      if (now - phaseSince >= T_GREEN) nextPhase();
-      break;
+    case P_B_GREEN:  if (now - phaseSince >= T_GREEN)  nextPhase(); break;
     case P_A_YELLOW:
-    case P_B_YELLOW:
-      if (now - phaseSince >= T_YELLOW) nextPhase();
-      break;
+    case P_B_YELLOW: if (now - phaseSince >= T_YELLOW) nextPhase(); break;
   }
 }
 
-
-// Infracciones SD1..SD5
+// =====================================================
+// Grupos lógicos A/B para UI (S1..S10) — SOLO afecta lo reportado a la UI/JSON
 // =====================================================
 #define SEM_A 0
 #define SEM_B 1
 
-// Emite un JSON NDJSON con el estado de los 4 botones de pánico. pressedIndex = 0..3 o -1 para ninguno
-void emitPanicButtonsJson(int pressedIndex){
-  uint32_t ts = millis();
-  Serial.print('{');
-  Serial.print("\"ts\":\""); Serial.print(ts); Serial.print("\",");
-  Serial.print("\"panic_buttons\":{");
-  for (int i=0;i<4;i++){
-    Serial.print('"'); Serial.print('P'); Serial.print('B'); Serial.print(i+1); Serial.print('"');
-    Serial.print(":{");
-    Serial.print("\"activo\":"); Serial.print(i==pressedIndex?1:0); Serial.print(',');
-    Serial.print("\"ts\":\""); Serial.print(ts); Serial.print("\",");
-    Serial.print("\"id\":\""); Serial.print("PB"); Serial.print(i+1); Serial.print("\"");
-    Serial.print('}');
-    if (i<3) Serial.print(',');
+// Mapeo solicitado: S3, S6 y S7 -> grupo B; los demás -> grupo A
+const uint8_t S_GROUP[10] = {
+  SEM_A,  // S1
+  SEM_A,  // S2
+  SEM_B,  // S3
+  SEM_A,  // S4
+  SEM_A,  // S5
+  SEM_B,  // S6
+  SEM_B,  // S7
+  SEM_A,  // S8
+  SEM_A,  // S9
+  SEM_A   // S10
+};
+
+// Devuelve "VERDE"/"AMARILLO"/"ROJO" para S1..S10 según la fase y el grupo S_GROUP
+const char* stateForIndex(int idx){
+  if (idx < 0 || idx >= 10) return "ROJO";   // seguridad
+  bool esA = (S_GROUP[idx] == SEM_A);
+  switch (phase){
+    case P_A_GREEN:   return esA ? "VERDE"    : "ROJO";
+    case P_A_YELLOW:  return esA ? "AMARILLO" : "ROJO";
+    case P_B_GREEN:   return esA ? "ROJO"     : "VERDE";
+    case P_B_YELLOW:  return esA ? "ROJO"     : "AMARILLO";
   }
-  Serial.print("},\"_protocol_version\":\"1.0\"}");
-  Serial.println();
+  return "ROJO";
 }
 
-
-// Grupos: SD1..SD4 -> A ; SD5 -> B
+// =====================================================
+// Infracciones SD1..SD5
+// =====================================================
 const uint8_t SD_GROUP[5] = { SEM_A, SEM_A, SEM_A, SEM_A, SEM_B };
-
-
-// Buzzer cercano para cada SD (según tu plano; AJUSTA si cambia)
-const uint8_t SD_BUZ[5] = {
-  BUZ4_PIN,     // SD1 -> BUZ4
-  BUZ_TU2_PIN,  // SD2 -> BUZ2
-  BUZ_TU1_PIN,  // SD3 -> BUZ1
-  BUZ3_PIN,     // SD4 -> BUZ3
-  BUZ_TU1_PIN   // SD5 -> BUZ1
-};
-
-const char* SD_SEMAFORO[5] = {
-  "S1",  // SD1 corresponde a Semáforo 1
-  "S3",  // SD2 corresponde a Semáforo 3
-  "S5",  // SD3 corresponde a Semáforo 5
-  "S7",  // SD4 corresponde a Semáforo 7
-  "S9"   // SD5 corresponde a Semáforo 9
-};
-
-
+const uint8_t SD_BUZ[5] = { BUZ4_PIN, BUZ_TU2_PIN, BUZ_TU1_PIN, BUZ3_PIN, BUZ_TU1_PIN };
 const float  SD_VIOL_CM = 10.0f;
 const uint8_t SD_REQ    = 2;
-
 
 inline bool isGroupRed(uint8_t g){
   return (g==SEM_A) ? (phase==P_B_GREEN || phase==P_B_YELLOW)
                     : (phase==P_A_GREEN || phase==P_A_YELLOW);
 }
 
-
 uint8_t sdConsec[5] = {0,0,0,0,0};
 bool    sdAlerted[5]= {false,false,false,false,false};
 
-
-inline void processSD(uint8_t idx){       // idx = 0..4 (SD1..SD5)
+inline void processSD(uint8_t idx){ // idx = 0..4 (SD1..SD5)
   uint8_t id = SD1 + idx;
   float cm = lastCm[id];
   bool red   = isGroupRed(SD_GROUP[idx]);
   bool below = (cm < SD_VIOL_CM);
 
-
-  // Depuración per-SD
-   //static uint32_t t[5];
-   //if (millis()-t[idx]>250){ Serial.print("SD");Serial.print(idx+1);Serial.print(",CM=");Serial.println(cm,1); t[idx]=millis(); }
-
-
   if (!red){ sdConsec[idx]=0; sdAlerted[idx]=false; return; }
-
 
   if (below){
     if (sdConsec[idx] < 255) sdConsec[idx]++;
     if (!sdAlerted[idx] && sdConsec[idx] >= SD_REQ){
       Serial.print("INFRACCION ROJO SD"); Serial.print(idx+1);
-      Serial.print(" en Semaforo "); Serial.print(SD_SEMAFORO[idx]);
       Serial.print(", cm="); Serial.println(cm,1);
       buzzPin(SD_BUZ[idx]);
       sdAlerted[idx] = true;
@@ -484,6 +331,24 @@ inline void processSD(uint8_t idx){       // idx = 0..4 (SD1..SD5)
 }
 inline void checkAllSD(){ for (uint8_t i=0;i<5;i++) processSD(i); }
 
+// --- Mapeo de infracciones SD -> caras S que se notifican al UI
+// Índices SD: 0..4  =>  SD1..SD5
+// S se expresan 1..10 (como los espera Processing en "S#")
+const uint8_t SD_TO_S_1[5] = {
+  10, // SD1 -> S10
+   7, // SD2 -> S7
+   2, // SD3 -> S2
+   6, // SD4 -> S6
+   1  // SD5 -> S1
+};
+const uint8_t SD_TO_S_2[5] = {
+   9, // SD1 -> S9
+   0, // SD2 -> (sin segundo)
+   4, // SD3 -> S4
+   0, // SD4 -> (sin segundo)
+   3  // SD5 -> S3
+};
+// Nota: si el segundo es 0, significa que ese SD solo mapea a una S.
 
 // =====================================================
 // SISMO (piezo en A6) - opcional
@@ -493,16 +358,13 @@ const uint16_t EQ_THR_ABS  = 40;
 const uint16_t EQ_THR_DIFF = 18;
 const uint32_t EQ_HOLD_MS  = 5000UL;
 
-
 int eq_base = 0, eq_prev = 0;
 uint32_t eq_hold_until = 0;
 bool eq_forced = false;
 
-
 void EQ_init(){
   pinMode(PIN_EQ, INPUT);
-  long sum = 0;
-  for (int i=0;i<50;i++){ sum += analogRead(PIN_EQ); delay(4); }
+  long sum = 0; for (int i=0;i<50;i++){ sum += analogRead(PIN_EQ); delay(4); }
   eq_base = (int)(sum/50);
   eq_prev = eq_base;
   Serial.print("EQ,BASE,"); Serial.println(eq_base);
@@ -542,6 +404,94 @@ void EQ_announceEndIfAny(){
   wasActive = act;
 }
 
+// =====================================================
+// STATUS JSON para Processing (JSON puro)
+// =====================================================
+uint32_t lastEmitMs = 0;
+const uint32_t EMIT_MS = 1000; // cada 1 s (ajusta a gusto)
+
+void emitStatusJson(){
+  Serial.print('{');
+
+  // ts
+  Serial.print("\"ts\":\""); Serial.print(millis()); Serial.print("\",");
+
+  // semáforos S1..S10 (texto) usando el mapeo S_GROUP
+  Serial.print("\"semaforos\":{");
+  for (int i=0;i<10;i++){
+    Serial.print('"'); Serial.print('S'); Serial.print(i+1); Serial.print('"'); Serial.print(':');
+    Serial.print('"'); Serial.print(stateForIndex(i)); Serial.print('"');
+    if (i<9) Serial.print(',');
+  }
+  Serial.print("},");
+
+  // dist_cm P1..P6 (entero redondeado) -> TM1, TM2, TU3, TU4, SD1, SD2
+  Serial.print("\"dist_cm\":{");
+  for (int i=0;i<6;i++){
+    Serial.print('"'); Serial.print('P'); Serial.print(i+1); Serial.print('"'); Serial.print(':');
+    int d = (int)round(lastCm[i]); // lastCm[0..5]
+    Serial.print(d);
+    if (i<5) Serial.print(',');
+  }
+  Serial.print("},");
+
+  // gas_ppm (desde A0/A1)
+  int a0 = analogRead(PIN_AO);
+  int a1 = analogRead(PIN_A1);
+  int gas1 = map(constrain(a0,0,1023),0,1023,150,300);
+  int gas2 = map(constrain(a1,0,1023),0,1023,150,300);
+  Serial.print("\"gas_ppm\":{");
+  Serial.print("\"Z1\":"); Serial.print(gas1); Serial.print(',');
+  Serial.print("\"Z2\":"); Serial.print(gas2); Serial.print("},");
+
+  // zumbador (placeholders)
+  Serial.print("\"zumbador\":{");
+  Serial.print("\"Z1\":0,\"Z2\":0},");  // puedes reflejar HIGH/LOW reales
+
+  // sismo
+  Serial.print("\"sismo\":{");
+  Serial.print("\"activo\":"); Serial.print(EQ_isActive()?1:0); Serial.print(',');
+  Serial.print("\"magnitud\":0.0,\"origen\":\"\"},");
+
+  // panic_buttons PB1..PB4 (1 si presionado hace <=3s)
+  Serial.print("\"panic_buttons\":{");
+  for (int i=0;i<4;i++){
+    Serial.print('"'); Serial.print('P'); Serial.print('B'); Serial.print(i+1); Serial.print('"'); Serial.print(':');
+    Serial.print('{');
+    Serial.print("\"activo\":"); Serial.print(buttonsActive[i]?1:0); Serial.print(',');
+    Serial.print("\"ts\":\""); Serial.print(millis()); Serial.print("\",");
+    Serial.print("\"id\":\"PB"); Serial.print(i+1); Serial.print("\"");
+    Serial.print('}');
+    if (i<3) Serial.print(',');
+  }
+  Serial.print("},");
+
+  // infracciones: publica S# según infracción SD# y el mapeo pedido
+  Serial.print("\"infracciones\":[");
+  bool first = true;
+  for (int sd = 0; sd < 5; sd++) {           // sd = 0..4 => SD1..SD5
+    if (sdAlerted[sd]) {                      // ya detectado en processSD
+      uint8_t sA = SD_TO_S_1[sd];
+      uint8_t sB = SD_TO_S_2[sd];
+      if (sA >= 1 && sA <= 10) {
+        if (!first) Serial.print(',');
+        Serial.print('"'); Serial.print('S'); Serial.print(sA); Serial.print('"');
+        first = false;
+      }
+      if (sB >= 1 && sB <= 10) {
+        if (!first) Serial.print(',');
+        Serial.print('"'); Serial.print('S'); Serial.print(sB); Serial.print('"');
+        first = false;
+      }
+    }
+  }
+  Serial.print("],");
+
+  // versión de protocolo
+  Serial.print("\"_protocol_version\":\"1.0\"}");
+
+  Serial.println();
+}
 
 // =====================================================
 // Setup / Loop
@@ -554,14 +504,12 @@ void setup() {
     pinMode(US_PINS[i].echo, INPUT);
   }
 
-
   // Semáforos
   pinMode(A_R, OUTPUT); pinMode(A_Y, OUTPUT); pinMode(A_G, OUTPUT);
   pinMode(B_R, OUTPUT); pinMode(B_Y, OUTPUT); pinMode(B_G, OUTPUT);
   pinMode(A_R2, OUTPUT); pinMode(A_Y2, OUTPUT); pinMode(A_G2, OUTPUT);
   pinMode(B_R2, OUTPUT); pinMode(B_Y2, OUTPUT); pinMode(B_G2, OUTPUT);
   phaseSince = millis(); applyLights();
-
 
   // Buzzers y botones
   pinMode(BUZ_TU1_PIN, OUTPUT); digitalWrite(BUZ_TU1_PIN, LOW);
@@ -573,127 +521,85 @@ void setup() {
   pinMode(BTN_BUZ3_PIN, INPUT_PULLUP);
   pinMode(BTN_BUZ4_PIN, INPUT_PULLUP);
 
-
   // Incendios
   pinMode(PIN_AO, INPUT);
   pinMode(PIN_A1, INPUT);
 
-
+  // Sismo
   EQ_init();
 }
 
-
 void loop() {
-  EQ_releaseOutputsIfEnded();
+  // Expirar “activo” de botones
+  for (int i=0;i<4;i++) if (buttonsActive[i] && millis() >= buttonsUntil[i]) buttonsActive[i]=false;
+
+  // Botones / zumbadores
   readButtonsAndTrigger();
+  updateBuzzers();
 
-
-  // Incendios + botones BUZ3/BUZ4
+  // Incendios + mezcla con BUZ3/BUZ4
   bool incendio1 = (analogRead(PIN_AO) >= HUMO_UMBRAL);
   bool incendio2 = (analogRead(PIN_A1) >= HUMO_UMBRAL);
   digitalWrite(BUZ3_PIN, (incendio1 || (millis() < buz3Until)) ? HIGH : LOW);
   digitalWrite(BUZ4_PIN, (incendio2 || (millis() < buz4Until)) ? HIGH : LOW);
 
-
-
-  // Lecturas ultrasónicas
+  // Lecturas ultrasónicas + ARRIVE/LEAVE
   for (uint8_t id = 0; id < N_SENSORS; id++) {
     float cm = readUltrasonicCm(id);
     lastCm[id] = cm;
 
-
-    // Solo paradas ARRIVE/LEAVE (TM1/TM2/TU3/TU4)
     float thr = thrFor(id);
     if (thr < 9000.0f) {
       bool below = (cm < thr);
       uint32_t now = millis();
 
-
-      // Entró bajo umbral
       if (!wasBelow[id] && below) {
         wasBelow[id] = true;
         stableReported[id] = false;
         belowStartMs[id] = now;
       }
 
-
-      // Llegada válida: ≥3s por debajo de THR_STOP_CM
       if (wasBelow[id] && !stableReported[id] && (now - belowStartMs[id] >= STABLE_MS)) {
         stableReported[id] = true;
-        if (id == TM1 || id == TM2) {
-          TM_onArrive(id);
-        } else if (id == TU3) {
-          TU_onArriveStop(1);
-        } else if (id == TU4) {
-          TU_onArriveStop(2);
-        }
-        // Armar ETA para dispararlo al irse
-        stopETAArmed[id] = true;
+        if (id == TM1 || id == TM2) TM_onArrive(id);
+        else if (id == TU3)          TU_onArriveStop(1);
+        else if (id == TU4)          TU_onArriveStop(2);
+        stopETAArmed[id] = true; // si mueves ETA al loop, úsalo
       }
 
-
-      // Salió de la parada (subió por encima del umbral)
       if (wasBelow[id] && !below) {
         wasBelow[id] = false;
         stableReported[id] = false;
 
+        if (id == TM1 || id == TM2) TM_onLeave(id);
+        else if (id == TU3)          TU_onLeaveStop(1);
+        else if (id == TU4)          TU_onLeaveStop(2);
 
-        if (id == TM1 || id == TM2) {
-          TM_onLeave(id);
-        } else if (id == TU3) {
-          TU_onLeaveStop(1);
-        } else if (id == TU4) {
-          TU_onLeaveStop(2);
-        }
-
-
-        // Publicar ETA SOLO si antes hubo llegada válida
-        if (stopETAArmed[id]) {
-          if (id == TM1 || id == TM2) {
-            uint8_t from = (id == TM1) ? 1 : 2;
-            uint8_t to   = (id == TM1) ? 2 : 1;
-            publishETA_TM(from, to);
-          } else if (id == TU3 || id == TU4) {
-            uint8_t from = (id == TU3) ? 1 : 2;
-            uint8_t to   = (id == TU3) ? 2 : 1;
-            publishETA_TU(from, to);
-          }
-        }
-        // Desarmar para no repetir
         stopETAArmed[id] = false;
       }
     }
   }
 
-
-  // --- Depuración de distancias de TM/TU ---
+  // Depuración (opcional)
   debugStopDistances();
-
 
   // Infracciones SD1..SD5
   checkAllSD();
 
-
-  // Semáforos y buzzers
+  // Semáforos
   updateTrafficLights();
-  updateBuzzers();
 
-
-  // Sismo opcional
+  // Sismo
   EQ_applyOutputs();
   EQ_announceEndIfAny();
+  EQ_poll();
 
-  // Expirar estados de panic buttons
-  for (int i=0;i<4;i++){
-    if (panicButtonsActiveState[i] && millis() >= panicButtonsUntil[i]) panicButtonsActiveState[i] = false;
-  }
-
-  // Emitir JSON periódico para Processing
+  // STATUS JSON periódico (compatible con tu readSerial() que exige '{' al inicio)
   if (millis() - lastEmitMs >= EMIT_MS) {
     emitStatusJson();
     lastEmitMs = millis();
   }
 
-
   delay(60);
-}
+} 
+

@@ -3,8 +3,14 @@
 class ConfigScreen extends Screen {
   private DataProvider dataProvider;
   private ArrayList<Button> configButtons;
-  private Text statusText;
-  private Text infoText;
+  // Layout dinámico
+  private float buttonsPanelY;
+  private float buttonsPanelHeight;
+  private float configPanelsY;
+  // Botones identificados
+  private Button toggleModeBtn;
+  private Button resetBtn;
+  private Button aboutBtn;
   
   ConfigScreen(float x, float y, float width, float height, DataProvider dataProvider) {
     super("Configuración del Sistema", x, y, width, height);
@@ -14,63 +20,41 @@ class ConfigScreen extends Screen {
   }
   
   void initializeComponents() {
-    configButtons = new ArrayList<Button>();
-    
-    float buttonY = y + 100;
-    float buttonWidth = 200;
-    float buttonHeight = 40;
-    float buttonSpacing = 20;
-    
-    // Botones de configuración
-    Button intervalButton = new Button("Cambiar Intervalo", x + 50, buttonY, buttonWidth, buttonHeight);
-    configButtons.add(intervalButton);
-    
-    Button resetButton = new Button("Reiniciar Datos", x + 50, buttonY + buttonHeight + buttonSpacing, 
-                                   buttonWidth, buttonHeight, Theme.ORANGE, Theme.WHITE);
-    configButtons.add(resetButton);
-    
-    Button exportButton = new Button("Exportar Configuración", x + 50, 
-                                   buttonY + (buttonHeight + buttonSpacing) * 2, 
-                                   buttonWidth, buttonHeight, Theme.PRIMARY_BLUE, Theme.WHITE);
-    configButtons.add(exportButton);
-    
-    Button aboutButton = new Button("Acerca del Sistema", x + 50, 
-                                  buttonY + (buttonHeight + buttonSpacing) * 3, 
-                                  buttonWidth, buttonHeight, Theme.MEDIUM_GRAY, Theme.WHITE);
-    configButtons.add(aboutButton);
-    
-    // Textos informativos
-    statusText = new Text("Sistema funcionando correctamente", x + 300, buttonY + 50, 
-                         Theme.GREEN, Theme.NORMAL_SIZE);
-    
-    infoText = new Text("", x + 50, y + 350, Theme.DARK_GRAY, Theme.SMALL_SIZE);
-    infoText.setAlignment(LEFT, TOP);
+  configButtons = new ArrayList<Button>();
+  float buttonWidth = 240;
+  float buttonHeight = 44;
+  float buttonSpacing = 18;
+
+  // Botón de toggle modo (label dinámico en render)
+  toggleModeBtn = new Button("Modo: ", 0, 0, buttonWidth, buttonHeight, Theme.PRIMARY_BLUE, Theme.WHITE);
+  resetBtn = new Button("Reiniciar Datos", 0, 0, buttonWidth, buttonHeight, Theme.ORANGE, Theme.WHITE);
+  aboutBtn = new Button("Acerca del Sistema", 0, 0, buttonWidth, buttonHeight, Theme.MEDIUM_GRAY, Theme.WHITE);
+  configButtons.add(toggleModeBtn);
+  configButtons.add(resetBtn);
+  configButtons.add(aboutBtn);
+
+  // Calcular layout base
+  buttonsPanelY = y + 80 + 260 + 25; // debajo panel info
+  buttonsPanelHeight = 30 + 30 + (configButtons.size()) * buttonHeight + (configButtons.size() - 1) * buttonSpacing + 20;
+  configPanelsY = buttonsPanelY + buttonsPanelHeight + 30;
   }
   
   void renderContent() {
     // Información del sistema
     renderSystemInfo();
+  // Panel de botones organizado
+  renderButtonsPanel();
     
-    // Botones de configuración
-    for (Button button : configButtons) {
-      button.render();
-    }
-    
-    // Estado del sistema
-    statusText.render();
-    
-    // Información adicional
-    renderConfigInfo();
-    
-    // Manual de usuario
-    renderUserManual();
+  // Config y manual
+  renderConfigInfo();
+  renderUserManual();
   }
   
   void renderSystemInfo() {
     // Panel de información del sistema
     float infoY = y + 80;
     float panelWidth = width - 100;
-    float panelHeight = 200;
+  float panelHeight = 260;
     
     drawSoftShadow(x + 50, infoY, panelWidth, panelHeight, 2);
     fill(Theme.WHITE);
@@ -94,21 +78,28 @@ class ConfigScreen extends Screen {
     String[] infoLines = {
       "• Semáforos monitoreados: 10 unidades (S1-S10)",
       "• Paradas con sensores: 6 ubicaciones (P1-P6)", 
-      "• Zonas de monitoreo de gas: 3 áreas (Z1-Z3)",
-      "• Intervalo de actualización: 2000 ms",
-      "• Estado de comunicación: Simulación activa",
+      "• Zonas de monitoreo de gas: 2 áreas (Z1-Z2)",
+  "• Ciclo semáforo (rojo→verde): " + dataProvider.getSemaforoCycle() + " ms",
+      "• Estado de comunicación: " + (dataProvider.isSimulationEnabled() ? "Simulación activa" : "Real/Serial"),
       "• Última reinicialización: " + getCurrentTime(),
-      "• Versión del sistema: 1.0.0"
+      "• Versión del sistema: 1.0.0",
+      "• Fuente datos: " + dataProvider.getLastSource(),
+      "• Total updates: " + dataProvider.getUpdateCount()
     };
     
     for (int i = 0; i < infoLines.length; i++) {
       text(infoLines[i], x + 65, infoY + 45 + i * 20);
     }
+    // Estado dentro del panel
+    fill(Theme.RED);
+    textSize(Theme.SMALL_SIZE);
+    textAlign(LEFT, BOTTOM);
+  text("Estado: OK", x + 65, infoY + panelHeight - 10);
   }
   
   void renderConfigInfo() {
     // Panel de configuraciones actuales
-    float configY = y + 300;
+  float configY = configPanelsY;
     float panelWidth = (width - 120) / 2;
     
     drawSoftShadow(x + 50, configY, panelWidth, 180, 2);
@@ -116,21 +107,23 @@ class ConfigScreen extends Screen {
     noStroke();
     rect(x + 50, configY, panelWidth, 180, 5);
     
-    fill(Theme.DARK_GRAY);
+  // Título en rojo
+  fill(Theme.RED);
     textAlign(LEFT, TOP);
     textSize(Theme.NORMAL_SIZE);
     text("Configuraciones Activas", x + 65, configY + 20);
     
-    fill(Theme.MEDIUM_GRAY);
+  // Contenido en rojo
+  fill(Theme.RED);
     textSize(Theme.SMALL_SIZE);
     
     String[] configLines = {
-      "Modo: Simulación",
-      "Auto-update: Activado",
-      "Alertas de pánico: Activadas",
-      "Detección de infracciones: Activa",
-      "Log de eventos: Habilitado",
-      "Nivel de debug: Normal"
+      "Modo: " + (dataProvider.isSimulationEnabled()?"Simulación":"Serial"),
+      "Auto-update: " + (dataProvider.isSimulationEnabled()?"Simulado":"Serial"),
+      "Botones pánico: 4 activos",
+      "Infracciones: Monitoreadas",
+      "Incendios: MQ-02 activo",
+      "Sismo: Sensor virtual"
     };
     
     for (int i = 0; i < configLines.length; i++) {
@@ -141,7 +134,7 @@ class ConfigScreen extends Screen {
   void renderUserManual() {
     // Manual de uso rápido
     float manualX = x + 70 + (width - 120) / 2;
-    float manualY = y + 300;
+  float manualY = configPanelsY;
     float panelWidth = (width - 120) / 2;
     
     drawSoftShadow(manualX, manualY, panelWidth, 180, 2);
@@ -149,28 +142,89 @@ class ConfigScreen extends Screen {
     noStroke();
     rect(manualX, manualY, panelWidth, 180, 5);
     
-    fill(Theme.DARK_GRAY);
+  // Título en rojo
+  fill(Theme.RED);
     textAlign(LEFT, TOP);
     textSize(Theme.NORMAL_SIZE);
     text("Controles Rápidos", manualX + 15, manualY + 20);
     
-    fill(Theme.MEDIUM_GRAY);
+  // Contenido en rojo
+  fill(Theme.RED);
     textSize(Theme.SMALL_SIZE);
     
     String[] controlLines = {
-      "R - Actualizar datos",
-      "U - Actualización manual",
-      "C - Ver datos en consola",
-      "Click - Navegar entre pantallas",
+      "R - Forzar refresh",
+      "U - Tick simulado",
+      "M - Modo (tecla)",
+      "C - Estado consola",
+      "H - Ayuda",
       "",
-      "Navegación:",
-      "• Dashboard: Vista general",
-      "• Monitoreo Humo: Calidad aire",
-      "• Tráfico: Estado semáforos"
+      "Pantallas:",
+      "Dashboard / Incendios / Semáforos / Distancias"
     };
     
     for (int i = 0; i < controlLines.length; i++) {
       text(controlLines[i], manualX + 15, manualY + 50 + i * 15);
+    }
+  }
+
+  // Panel organizado de botones de configuración
+  void renderButtonsPanel() {
+    float panelX = x + 50;
+    float panelWidth = width - 100;
+    drawSoftShadow(panelX, buttonsPanelY, panelWidth, buttonsPanelHeight, 2);
+    fill(Theme.WHITE);
+    noStroke();
+  rect(panelX, buttonsPanelY, panelWidth, buttonsPanelHeight, 5);
+    // Título
+    fill(Theme.PRIMARY_BLUE);
+    rect(panelX, buttonsPanelY, panelWidth, 30, 5,5,0,0);
+    fill(Theme.WHITE);
+    textAlign(LEFT, CENTER);
+    textSize(Theme.NORMAL_SIZE);
+    text("Acciones de Configuración", panelX + 15, buttonsPanelY + 15);
+    // Layout interno
+    float innerX = panelX + 30;
+    float innerY = buttonsPanelY + 50;
+    float buttonSpacingY = 18;
+    for (int i = 0; i < configButtons.size(); i++) {
+      Button b = configButtons.get(i);
+      // Label dinámico para toggle
+      if (b == toggleModeBtn) {
+        b.setLabel("Cambiar a: " + (dataProvider.isSimulationEnabled()?"Serial":"Simulación"));
+      }
+      b.setSize(240, 44);
+      float bx = innerX;
+      float by = innerY + i * (b.h + buttonSpacingY);
+      b.setPosition(bx, by);
+      b.render();
+    }
+  }
+  
+  void handleMousePressed(float mx, float my) {
+    for (Button b : configButtons) {
+      if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+        if (b == toggleModeBtn) {
+          // Toggle simulación/serial
+          if (dataProvider.isSimulationEnabled()) {
+            // Intentar ir a serial real (si serial no está habilitado avisar via println)
+            if (dataProvider.isSerialMode()) {
+              dataProvider.setSimulationEnabled(false);
+              println("[Config] Cambio a modo Serial Real.");
+            } else {
+              println("[Config] No hay puerto serial; permanece en simulación.");
+            }
+          } else {
+            dataProvider.setSimulationEnabled(true);
+            println("[Config] Cambio a modo Simulación.");
+          }
+        } else if (b == resetBtn) {
+          dataProvider.forceUpdate();
+          println("[Config] Datos simulados regenerados.");
+        } else if (b == aboutBtn) {
+          println("[Config] Sistema ARQUI2 - Demo v1.0");
+        }
+      }
     }
   }
 }

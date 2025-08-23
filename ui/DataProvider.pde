@@ -1,55 +1,81 @@
-// Proveedor de datos simulado para el sistema de tráfico urbano
-// Simula comunicación serial con datos de semáforos y paradas
+import java.util.HashSet;
 
+// Proveedor de datos para el sistema de tráfico urbano
 class DataProvider {
   private JSONObject currentData;
   private long lastUpdateTime;
   private int updateInterval = 2000; // Actualizar cada 2 segundos
+  private int semaforoCycleMs = 5000; // Duración del ciclo para semáforos
+  private long lastSemaforoChangeTime = 0;
+  private JSONObject semaforosCache = null; // cache para mantener estado hasta próximo ciclo
   
   // Modos de operación
   private boolean serialMode = false;
-  private boolean simulationEnabled = true; // Nuevo: permite intercambiar entre simulado y real
+  private boolean simulationEnabled = true;
   
   // Metadatos de diagnóstico
   private String lastSource = "simulado"; // "simulado" | "serial" | "desconectado"
   private int updateCount = 0;
-  private long serialTimeoutMs = 5000; // 5 segundos sin datos serial = modo simulado automático
+  private long serialTimeoutMs = 5000; // 5 s sin datos serial => timeout
   private long lastSerialDataTime = 0;
   
   // Estados posibles para semáforos
   private String[] semaforoStates = {"ROJO", "VERDE", "AMARILLO"};
   
-  // IDs de semáforos (10 semáforos)
+  // IDs
   private String[] semaforoIds = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10"};
+  private String[] paradaIds   = {"P1", "P2", "P3", "P4", "P5", "P6"};
+  private String[] zonaIds     = {"Z1", "Z2"};
+  private String[] panicButtonIds = {"PB1", "PB2", "PB3", "PB4"};
+  private int[] panicButtonsCooldown = new int[4];
+
+  // Sismo simulado
+  private int sismoCooldown = 0;
+  private float lastSismoMagnitud = 0;
+  private String sismoOrigin = "";
   
-  // IDs de paradas (6 paradas)
-  private String[] paradaIds = {"P1", "P2", "P3", "P4", "P5", "P6"};
-  
-  // Zonas de gas y pánico (simplificado a 3 zonas)
-  private String[] zonaIds = {"Z1", "Z2", "Z3"};
-  
+  // === NUEVO: conjunto de infracciones recibidas ===
+  private final HashSet<String> infraSet = new HashSet<String>();
+
   DataProvider() {
     lastUpdateTime = millis();
     lastSerialDataTime = millis();
     generateNewData();
   }
+
+  // ======= Reglas de fallback (solo si NO llega 'infracciones' desde Arduino) =======
+  JSONArray computeInfraccionesFromSemaforos(JSONObject data) {
+    JSONArray result = new JSONArray();
+    try {
+      JSONObject semaforos = data.getJSONObject("semaforos");
+      JSONObject dist = data.getJSONObject("dist_cm");
+      int umbral = 50;
+      for (int i = 0; i < semaforoIds.length; i++) {
+        String semId = semaforoIds[i];
+        int pidx = (i % paradaIds.length); // S1..S10 -> P1..P6 cíclico
+        String paradaId = paradaIds[pidx];
+        if (semaforos.hasKey(semId) && dist.hasKey(paradaId)) {
+          String estado = semaforos.getString(semId);
+          int d = dist.getInt(paradaId);
+          if ("ROJO".equals(estado) && d < umbral) result.append(semId);
+        }
+      }
+    } catch (Exception e) { }
+    return result;
+  }
+
   // Método principal para obtener datos actuales
   JSONObject getCurrentData() {
-    // Verificar timeout de datos serial
     checkSerialTimeout();
-    
-    // Solo generar datos simulados si está habilitado y no hay datos reales recientes
     if (simulationEnabled && (!serialMode || isSerialTimedOut())) {
       if (millis() - lastUpdateTime > updateInterval) {
         generateNewData();
         lastUpdateTime = millis();
       }
     }
-    
     return currentData;
   }
   
-  // Verificar si hay timeout en datos serial
   private void checkSerialTimeout() {
     if (serialMode && isSerialTimedOut() && !simulationEnabled) {
       println("[DataProvider] Timeout de datos serial. Cambiando a modo simulado automáticamente.");
@@ -57,7 +83,6 @@ class DataProvider {
       lastSource = "simulado_auto";
     }
   }
-  
   private boolean isSerialTimedOut() {
     return (millis() - lastSerialDataTime) > serialTimeoutMs;
   }
@@ -65,222 +90,187 @@ class DataProvider {
   // Generar nuevos datos simulados
   void generateNewData() {
     currentData = new JSONObject();
-    
-    // Timestamp actual
     currentData.setString("ts", getCurrentTimestamp());
     
-    // Generar estados de semáforos (legacy S1..S10)
-    JSONObject semaforos = new JSONObject();
-    for (String semaforoId : semaforoIds) {
-      String estado = semaforoStates[int(random(3))];
-      semaforos.setString(semaforoId, estado);
-    }
-    currentData.setJSONObject("semaforos", semaforos);
+    updateSemaforosIfNeeded();
+    currentData.setJSONObject("semaforos", semaforosCache);
 
-    // NUEVO: Generar estados de semáforos por tipo y calle (A1..A3, B1..B3)
-    JSONObject semaforosAB = new JSONObject();
-    for (int i = 1; i <= 3; i++) {
-      semaforosAB.setString("A" + i, semaforoStates[int(random(3))]);
-    }
-    for (int i = 1; i <= 3; i++) {
-      semaforosAB.setString("B" + i, semaforoStates[int(random(3))]);
-    }
-    currentData.setJSONObject("semaforosAB", semaforosAB);
-    
-    // Generar distancias en paradas (en cm)
+    // Distancias
     JSONObject distancias = new JSONObject();
     for (String paradaId : paradaIds) {
-      int distancia = int(random(20, 500)); // 20cm a 5m
+      int distancia = int(random(20, 500));
       distancias.setInt(paradaId, distancia);
     }
     currentData.setJSONObject("dist_cm", distancias);
     
-    // Generar niveles de gas (en ppm)
+    // Gas
     JSONObject gas = new JSONObject();
     for (String zonaId : zonaIds) {
-      int gasPpm = int(random(150, 300)); // 150-300 ppm
+      int gasPpm = int(random(150, 300));
       gas.setInt(zonaId, gasPpm);
     }
     currentData.setJSONObject("gas_ppm", gas);
     
-    // Generar estado de pánico (0 o 1)
-    JSONObject panico = new JSONObject();
+    // Zumbador (derivable de PBs si quieres, lo dejamos aleatorio simple)
+    JSONObject zumbador = new JSONObject();
     for (String zonaId : zonaIds) {
-      int panicoState = random(1) > 0.8 ? 1 : 0; // 20% probabilidad de pánico
-      panico.setInt(zonaId, panicoState);
+      int zState = random(1) > 0.8 ? 1 : 0;
+      zumbador.setInt(zonaId, zState);
     }
-    currentData.setJSONObject("panico", panico);
-    
-    // Generar infracciones (lista de paradas con infracciones) - legacy
-    JSONArray infracciones = new JSONArray();
-    for (String paradaId : paradaIds) {
-      if (random(1) > 0.7) { // 30% probabilidad de infracción
-        infracciones.append(paradaId);
+    currentData.setJSONObject("zumbador", zumbador);
+
+    // Sismo
+    JSONObject sismo = new JSONObject();
+    if (sismoCooldown > 0) {
+      sismo.setInt("activo", 1);
+      sismo.setFloat("magnitud", lastSismoMagnitud);
+      sismo.setString("origen", sismoOrigin == null ? "" : sismoOrigin);
+      sismoCooldown--;
+    } else {
+      if (random(1) > 0.95) {
+        lastSismoMagnitud = round(random(3.0, 6.8) * 10) / 10.0;
+        sismoCooldown = int(random(2, 5));
+        sismoOrigin = "simulado";
+        sismo.setInt("activo", 1);
+        sismo.setFloat("magnitud", lastSismoMagnitud);
+        sismo.setString("origen", sismoOrigin);
+      } else {
+        sismo.setInt("activo", 0);
+        sismo.setFloat("magnitud", 0);
+        sismo.setString("origen", "");
+        sismoOrigin = "";
       }
     }
-    currentData.setJSONArray("infracciones", infracciones);
+    currentData.setJSONObject("sismo", sismo);
 
-    // NUEVO: Infracciones detalladas por tipo/calle
-    JSONArray infrDet = new JSONArray();
-    // Simular 0-3 infracciones al azar
-    int n = int(random(0, 3.99));
-    for (int i = 0; i < n; i++) {
-      JSONObject d = new JSONObject();
-      d.setString("tipo", random(1) > 0.5 ? "A" : "B");
-      d.setInt("calle", int(random(1, 3.99))); // 1..3
-      infrDet.append(d);
+    // Botones de pánico (4)
+    JSONObject panicButtons = new JSONObject();
+    for (int i = 0; i < panicButtonIds.length; i++) {
+      int active;
+      if (panicButtonsCooldown[i] > 0) { active = 1; panicButtonsCooldown[i]--; }
+      else { active = (random(1) > 0.94) ? 1 : 0; if (active==1) panicButtonsCooldown[i] = int(random(1,3)); }
+      JSONObject btn = new JSONObject();
+      btn.setInt("activo", active);
+      btn.setString("ts", getCurrentTimestamp());
+      btn.setString("id", panicButtonIds[i]);
+      panicButtons.setJSONObject(panicButtonIds[i], btn);
     }
-    currentData.setJSONArray("infracciones_detalle", infrDet);
-    
+    currentData.setJSONObject("panic_buttons", panicButtons);
+
+    // === Infracciones: en simulación, por defecto VACÍO ===
+    currentData.setJSONArray("infracciones", new JSONArray());
+    infraSet.clear();
+
     if (simulationEnabled) {
       lastSource = serialMode && !isSerialTimedOut() ? "simulado_manual" : "simulado";
     }
     updateCount++;
   }
   
-  // Obtener datos formateados como String (para mostrar o enviar por serial)
-  String getDataAsString() {
-    return getCurrentData().toString();
-  }
-  
-  // Obtener datos formateados como JSON legible
+  // Strings helper
+  String getDataAsString() { return getCurrentData().toString(); }
   String getDataAsFormattedString() {
     JSONObject data = getCurrentData();
     StringBuilder sb = new StringBuilder();
-    
     sb.append("{\n");
     sb.append("  \"ts\": \"").append(data.getString("ts")).append("\",\n");
-    
-    // Semáforos
-    sb.append("  \"semaforos\": {");
-    JSONObject semaforos = data.getJSONObject("semaforos");
-    String[] keys = (String[]) semaforos.keys().toArray(new String[0]);
-    for (int i = 0; i < keys.length; i++) {
-      sb.append("\"").append(keys[i]).append("\":\"").append(semaforos.getString(keys[i])).append("\"");
-      if (i < keys.length - 1) sb.append(",");
-    }
-    sb.append("},\n");
-    
-    // Distancias
-    sb.append("  \"dist_cm\": {");
-    JSONObject distancias = data.getJSONObject("dist_cm");
-    keys = (String[]) distancias.keys().toArray(new String[0]);
-    for (int i = 0; i < keys.length; i++) {
-      sb.append("\"").append(keys[i]).append("\":").append(distancias.getInt(keys[i]));
-      if (i < keys.length - 1) sb.append(",");
-    }
-    sb.append("},\n");
-    
-    // Gas
-    sb.append("  \"gas_ppm\": {");
-    JSONObject gas = data.getJSONObject("gas_ppm");
-    keys = (String[]) gas.keys().toArray(new String[0]);
-    for (int i = 0; i < keys.length; i++) {
-      sb.append("\"").append(keys[i]).append("\":").append(gas.getInt(keys[i]));
-      if (i < keys.length - 1) sb.append(",");
-    }
-    sb.append("},\n");
-    
-    // Pánico
-    sb.append("  \"panico\": {");
-    JSONObject panico = data.getJSONObject("panico");
-    keys = (String[]) panico.keys().toArray(new String[0]);
-    for (int i = 0; i < keys.length; i++) {
-      sb.append("\"").append(keys[i]).append("\":").append(panico.getInt(keys[i]));
-      if (i < keys.length - 1) sb.append(",");
-    }
-    sb.append("},\n");
-    
-    // Infracciones
-    sb.append("  \"infracciones\": [");
-    JSONArray infracciones = data.getJSONArray("infracciones");
-    for (int i = 0; i < infracciones.size(); i++) {
-      sb.append("\"").append(infracciones.getString(i)).append("\"");
-      if (i < infracciones.size() - 1) sb.append(",");
-    }
-    sb.append("]\n");
-    
+    sb.append("  \"semaforos\": ").append(data.getJSONObject("semaforos")).append(",\n");
+    sb.append("  \"dist_cm\": ").append(data.getJSONObject("dist_cm")).append(",\n");
+    sb.append("  \"gas_ppm\": ").append(data.getJSONObject("gas_ppm")).append(",\n");
+    sb.append("  \"zumbador\": ").append(data.getJSONObject("zumbador")).append(",\n");
+    sb.append("  \"infracciones\": ").append(data.getJSONArray("infracciones")).append("\n");
     sb.append("}");
-    
     return sb.toString();
   }
   
-  // Generar timestamp actual en formato ISO
   String getCurrentTimestamp() {
-    return year() + "-" + 
-           nf(month(), 2) + "-" + 
-           nf(day(), 2) + "T" + 
-           nf(hour(), 2) + ":" + 
-           nf(minute(), 2) + ":" + 
-           nf(second(), 2) + "Z";
+    return year() + "-" + nf(month(), 2) + "-" + nf(day(), 2) + "T" +
+           nf(hour(), 2) + ":" + nf(minute(), 2) + ":" + nf(second(), 2) + "Z";
   }
   
-  // Métodos específicos para obtener datos por categoría
-  JSONObject getSemaforoData() {
-    return getCurrentData().getJSONObject("semaforos");
+  JSONObject getSemaforoData() { return getCurrentData().getJSONObject("semaforos"); }
+  JSONObject getDistanciaData() { return getCurrentData().getJSONObject("dist_cm"); }
+  JSONObject getGasData() { return getCurrentData().getJSONObject("gas_ppm"); }
+  JSONObject getZumbadorData() { return getCurrentData().getJSONObject("zumbador"); }
+  JSONObject getSismoData() { return getCurrentData().getJSONObject("sismo"); }
+  JSONObject getPanicButtonsData() { return getCurrentData().getJSONObject("panic_buttons"); }
+  JSONArray  getInfraccionesData() { return getCurrentData().getJSONArray("infracciones"); }
+
+  // === NUEVO: consulta para la UI ===
+  boolean isInfraction(String sid) { return infraSet.contains(sid); }
+
+  // Sismos manuales (opcional)
+  void triggerSismo(float magnitud, int duracionCiclos, String origin) {
+    if (magnitud <= 0) magnitud = round(random(3.0, 6.5) * 10) / 10.0;
+    if (duracionCiclos <= 0) duracionCiclos = 3;
+    lastSismoMagnitud = magnitud;
+    sismoCooldown = duracionCiclos;
+    sismoOrigin = origin == null ? "manual" : origin;
+    JSONObject sismo = new JSONObject();
+    sismo.setInt("activo", 1);
+    sismo.setFloat("magnitud", lastSismoMagnitud);
+    sismo.setString("origen", sismoOrigin);
+    currentData.setJSONObject("sismo", sismo);
+  }
+  void resetSismo() {
+    lastSismoMagnitud = 0; sismoCooldown = 0; sismoOrigin = "";
+    JSONObject sismo = new JSONObject();
+    sismo.setInt("activo", 0); sismo.setFloat("magnitud", 0); sismo.setString("origen", "");
+    currentData.setJSONObject("sismo", sismo);
+  }
+  void triggerPanicButton(String origin) {
+    // Forzar PB1 solo en sim
+    if (simulationEnabled) {
+      JSONObject pb = currentData.hasKey("panic_buttons") ? currentData.getJSONObject("panic_buttons") : new JSONObject();
+      JSONObject btn = new JSONObject();
+      btn.setInt("activo", 1);
+      btn.setString("ts", getCurrentTimestamp());
+      btn.setString("id", "PB1");
+      pb.setJSONObject("PB1", btn);
+      currentData.setJSONObject("panic_buttons", pb);
+    }
+  }
+  void resetPanicButton() {
+    if (simulationEnabled) {
+      JSONObject pb = currentData.hasKey("panic_buttons") ? currentData.getJSONObject("panic_buttons") : new JSONObject();
+      JSONObject btn = new JSONObject();
+      btn.setInt("activo", 0);
+      btn.setString("ts", getCurrentTimestamp());
+      btn.setString("id", "PB1");
+      pb.setJSONObject("PB1", btn);
+      currentData.setJSONObject("panic_buttons", pb);
+    }
   }
   
-  JSONObject getDistanciaData() {
-    return getCurrentData().getJSONObject("dist_cm");
-  }
+  // Config
+  void setUpdateInterval(int intervalMs) { this.updateInterval = intervalMs; }
+  int  getUpdateInterval() { return updateInterval; }
+  void setSemaforoCycle(int ms) { semaforoCycleMs = ms; }
+  int  getSemaforoCycle() { return semaforoCycleMs; }
   
-  JSONObject getGasData() {
-    return getCurrentData().getJSONObject("gas_ppm");
-  }
-  
-  JSONObject getPanicoData() {
-    return getCurrentData().getJSONObject("panico");
-  }
-  
-  JSONArray getInfraccionesData() {
-    return getCurrentData().getJSONArray("infracciones");
-  }
-  
-  // Configurar intervalo de actualización
-  void setUpdateInterval(int intervalMs) {
-    this.updateInterval = intervalMs;
-  }
-  
-  
-  // Habilitar/deshabilitar modo serial (datos externos)
   void setSerialMode(boolean enabled) {
     this.serialMode = enabled;
     if (enabled) {
-      lastSerialDataTime = millis(); // Resetear timeout
+      lastSerialDataTime = millis();
       println("[DataProvider] Modo serial activado. Esperando datos reales...");
     } else {
       println("[DataProvider] Modo serial desactivado. Usando datos simulados.");
     }
   }
+  boolean isSerialMode() { return serialMode; }
   
-  boolean isSerialMode() {
-    return serialMode;
-  }
-  
-  // Nuevos métodos para control de simulación
   void setSimulationEnabled(boolean enabled) {
     this.simulationEnabled = enabled;
-    if (enabled) {
-      println("[DataProvider] Simulación activada.");
-      lastSource = "simulado_manual";
-    } else {
-      println("[DataProvider] Simulación desactivada. Solo datos reales.");
-      lastSource = serialMode ? "serial" : "desconectado";
-    }
+    if (enabled) { println("[DataProvider] Simulación activada."); lastSource = "simulado_manual"; }
+    else { println("[DataProvider] Simulación desactivada. Solo datos reales."); lastSource = serialMode ? "serial" : "desconectado"; }
   }
+  boolean isSimulationEnabled() { return simulationEnabled; }
   
-  boolean isSimulationEnabled() {
-    return simulationEnabled;
-  }
-  
-  // Intercambiar entre modos
   void toggleDataMode() {
     if (serialMode && !simulationEnabled) {
-      // Está en modo serial puro -> cambiar a simulado
       setSimulationEnabled(true);
       println("[DataProvider] Cambiado a: DATOS SIMULADOS");
     } else if (simulationEnabled) {
-      // Está en modo simulado -> cambiar a serial puro (si hay conexión)
       if (serialMode) {
         setSimulationEnabled(false);
         println("[DataProvider] Cambiado a: DATOS REALES (Serial)");
@@ -290,36 +280,40 @@ class DataProvider {
     }
   }
   
-  // Obtener estado actual del modo
   String getCurrentMode() {
-    if (!serialMode) {
-      return "Solo Simulado";
-    } else if (simulationEnabled) {
-      return isSerialTimedOut() ? "Simulado (Serial timeout)" : "Simulado (Manual)";
-    } else {
-      return isSerialTimedOut() ? "Desconectado" : "Datos Reales";
-    }
+    if (!serialMode) return "Solo Simulado";
+    else if (simulationEnabled) return isSerialTimedOut() ? "Simulado (Serial timeout)" : "Simulado (Manual)";
+    else return isSerialTimedOut() ? "Desconectado" : "Datos Reales";
   }
   
-  // Inyectar datos externos (por ejemplo, desde Arduino)
+  // Inyectar datos externos (Arduino)
   void setExternalData(JSONObject externalData) {
     if (externalData == null) return;
     
     this.currentData = externalData;
     this.lastUpdateTime = millis();
-    this.lastSerialDataTime = millis(); // Actualizar timestamp de datos serial
+    this.lastSerialDataTime = millis();
     this.lastSource = "serial";
     updateCount++;
-    
-    // Si recibimos datos reales, automáticamente desactivar simulación (a menos que esté forzada)
-    if (simulationEnabled && serialMode) {
-      println("[DataProvider] Datos reales recibidos. Desactivando simulación automática.");
-      // No desactivar simulationEnabled aquí para mantener control manual
+
+    // === Capturar infracciones EXACTAMENTE como vienen ===
+    infraSet.clear();
+    if (externalData.hasKey("infracciones")) {
+      try {
+        JSONArray arr = externalData.getJSONArray("infracciones");
+        for (int i = 0; i < arr.size(); i++) {
+          String sid = arr.getString(i);
+          if (sid != null) infraSet.add(sid);
+        }
+      } catch(Exception e) { }
+    } else {
+      // Fallback: si Arduino no envía el campo, podemos calcularlo
+      JSONArray fallback = computeInfraccionesFromSemaforos(externalData);
+      for (int i = 0; i < fallback.size(); i++) infraSet.add(fallback.getString(i));
+      currentData.setJSONArray("infracciones", fallback);
     }
   }
   
-  
-  // Forzar actualización de datos
   void forceUpdate() {
     if (simulationEnabled) {
       generateNewData();
@@ -329,29 +323,19 @@ class DataProvider {
       println("[DataProvider] En modo serial. No se pueden forzar datos simulados.");
     }
   }
-  
-  // Forzar reconexión serial
   void forceSerialReconnection() {
     lastSerialDataTime = millis();
     println("[DataProvider] Timeout de serial reseteado. Intentando reconectar...");
   }
 
   // --- Diagnóstico ---
-  String getLastSource() {
-    return lastSource;
-  }
-
-  int getUpdateCount() {
-    return updateCount;
-  }
-
+  String getLastSource() { return lastSource; }
+  int getUpdateCount() { return updateCount; }
   String getLastTimestamp() {
     if (currentData == null) return "";
     if (currentData.hasKey("ts")) return currentData.getString("ts");
     return "";
   }
-  
-  // Información de estado detallada
   String getDetailedStatus() {
     StringBuilder status = new StringBuilder();
     status.append("=== ESTADO DEL DATA PROVIDER ===\n");
@@ -361,54 +345,78 @@ class DataProvider {
     status.append("Última fuente: ").append(lastSource).append("\n");
     status.append("Actualizaciones totales: ").append(updateCount).append("\n");
     status.append("Último timestamp: ").append(getLastTimestamp()).append("\n");
-    
     if (serialMode) {
       long timeSinceSerial = millis() - lastSerialDataTime;
       status.append("Tiempo sin datos serial: ").append(timeSinceSerial).append("ms\n");
       status.append("Timeout serial: ").append(isSerialTimedOut() ? "SÍ" : "NO").append("\n");
     }
-    
     status.append("Intervalo de actualización: ").append(updateInterval).append("ms\n");
     status.append("=================================");
     return status.toString();
   }
   
-  // Obtener estadísticas rápidas
+  // Estadísticas rápidas (NO pisa 'infracciones' si ya vino de Arduino)
   TrafficStats getStats() {
     JSONObject data = getCurrentData();
     
-    // Contar semáforos por estado
     JSONObject semaforos = data.getJSONObject("semaforos");
     int rojosCount = 0, verdesCount = 0, amarillosCount = 0;
-    
     for (String semaforoId : semaforoIds) {
       String estado = semaforos.getString(semaforoId);
-      if (estado.equals("ROJO")) rojosCount++;
-      else if (estado.equals("VERDE")) verdesCount++;
-      else if (estado.equals("AMARILLO")) amarillosCount++;
+      if ("ROJO".equals(estado)) rojosCount++;
+      else if ("VERDE".equals(estado)) verdesCount++;
+      else if ("AMARILLO".equals(estado)) amarillosCount++;
     }
-    
-    // Contar zonas en pánico
-    JSONObject panico = data.getJSONObject("panico");
-    int panicoCount = 0;
-    for (String zonaId : zonaIds) {
-      if (panico.getInt(zonaId) == 1) panicoCount++;
+
+    // Asegurar que currentData tenga el arreglo 'infracciones'
+    if (!data.hasKey("infracciones")) {
+      JSONArray fallback = computeInfraccionesFromSemaforos(data);
+      data.setJSONArray("infracciones", fallback);
+      infraSet.clear();
+      for (int i = 0; i < fallback.size(); i++) infraSet.add(fallback.getString(i));
     }
-    
-    // Contar infracciones
-    JSONArray infracciones = data.getJSONArray("infracciones");
-    int infraccionesCount = infracciones.size();
-    
-    // Calcular promedio de gas
+    int infraccionesCount = data.getJSONArray("infracciones").size();
+
+    // PBs activos como “zumbador”
+    int zumbadorCount = 0;
+    if (data.hasKey("panic_buttons")) {
+      try {
+        JSONObject pbs = data.getJSONObject("panic_buttons");
+        String[] pbKeys = (String[]) pbs.keys().toArray(new String[0]);
+        for (int i = 0; i < pbKeys.length; i++) {
+          JSONObject btn = pbs.getJSONObject(pbKeys[i]);
+          if (btn.hasKey("activo") && btn.getInt("activo") == 1) zumbadorCount++;
+        }
+      } catch(Exception ex) { }
+    }
+
     JSONObject gas = data.getJSONObject("gas_ppm");
     int gasTotal = 0;
-    for (String zonaId : zonaIds) {
-      gasTotal += gas.getInt(zonaId);
-    }
+    for (String zonaId : zonaIds) gasTotal += gas.getInt(zonaId);
     int gasPromedio = gasTotal / zonaIds.length;
     
-    return new TrafficStats(rojosCount, verdesCount, amarillosCount, 
-                           panicoCount, infraccionesCount, gasPromedio);
+    return new TrafficStats(rojosCount, verdesCount, amarillosCount, zumbadorCount, infraccionesCount, gasPromedio);
+  }
+
+  // Actualiza los semáforos solo cuando el ciclo se cumple
+  void updateSemaforosIfNeeded() {
+    if (semaforosCache == null) {
+      semaforosCache = new JSONObject();
+      for (String id : semaforoIds) semaforosCache.setString(id, semaforoStates[int(random(3))]);
+      lastSemaforoChangeTime = millis();
+      return;
+    }
+    if (millis() - lastSemaforoChangeTime >= semaforoCycleMs) {
+      for (String id : semaforoIds) {
+        String estado = semaforosCache.getString(id);
+        String nuevo = "ROJO";
+        if ("ROJO".equals(estado)) nuevo = "VERDE";
+        else if ("VERDE".equals(estado)) nuevo = "AMARILLO";
+        else nuevo = "ROJO";
+        semaforosCache.setString(id, nuevo);
+      }
+      lastSemaforoChangeTime = millis();
+    }
   }
 }
 
@@ -417,15 +425,15 @@ class TrafficStats {
   public int semaforosRojos;
   public int semaforosVerdes; 
   public int semaforosAmarillos;
-  public int zonasPanico;
+  public int zonasZumbador;
   public int infracciones;
   public int gasPromedio;
   
-  TrafficStats(int rojos, int verdes, int amarillos, int panico, int infracciones, int gas) {
+  TrafficStats(int rojos, int verdes, int amarillos, int zumbadorCount, int infracciones, int gas) {
     this.semaforosRojos = rojos;
     this.semaforosVerdes = verdes;
     this.semaforosAmarillos = amarillos;
-    this.zonasPanico = panico;
+    this.zonasZumbador = zumbadorCount;
     this.infracciones = infracciones;
     this.gasPromedio = gas;
   }

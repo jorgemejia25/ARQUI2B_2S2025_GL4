@@ -1,0 +1,1 @@
+ /Users/jorgemejia/Documents/USAC/arqui2/seguridad_trafico/.dart_tool/flutter_build/4a77ee2e3aaed00e4c9cf1fbc947d513/native_assets.json: 

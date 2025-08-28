@@ -1,0 +1,56 @@
+{
+  "ts": "2025-01-27T15:30:45Z",
+  "semaforos": {
+    "S1": "VERDE",
+    "S2": "ROJO",
+    "S3": "VERDE",
+    "S4": "AMARILLO",
+    "S5": "ROJO",
+    "S6": "VERDE",
+    "S7": "AMARILLO",
+    "S8": "VERDE",
+    "S9": "ROJO",
+    "S10": "VERDE"
+  },
+  "dist_cm": {
+    "P1": 85,
+    "P2": 40,
+    "P3": 230,
+    "P4": 410,
+    "P5": 30,
+    "P6": 120
+  },
+  "gas_ppm": {
+    "Z1": 225,
+    "Z2": 185
+  },
+  "zumbador": {
+    "Z1": 0,
+    "Z2": 0
+  },
+  "sismo": {
+    "activo": 0,
+    "magnitud": 0.0,
+    "origen": ""
+  },
+  "panic_buttons": {
+    "PB1": { "activo": 0, "ts": "2025-01-27T15:30:12Z", "id": "PB1" },
+    "PB2": { "activo": 0, "ts": "2025-01-27T15:31:05Z", "id": "PB2" },
+    "PB3": { "activo": 1, "ts": "2025-01-27T15:34:40Z", "id": "PB3" },
+    "PB4": { "activo": 0, "ts": "2025-01-27T15:10:00Z", "id": "PB4" }
+  },
+  "infracciones": ["S2", "S5"],
+
+  "eta": {
+    "P1": "TU,ETA_S=45,FROM=Centro,TO=P1",
+    "P2": "TU,ETA_S=120,FROM=Zona1,TO=P2",
+    "P3": "M,ETA_S=30,FROM=Estacion1,TO=P3",
+    "P4": "M,ETA_S=180,FROM=Estacion2,TO=P4",
+    "P5": "TU,ETA_S=90,FROM=Zona2,TO=P5",
+    "P6": "M,ETA_S=240,FROM=Estacion3,TO=P6"
+  },
+
+  "_protocol_version": "1.1",
+  "_eta_format": "M,ETA_S,FROM=x,TO=y,<seg> | TU,ETA_S,FROM=x",
+  "_notes": "Nuevo campo 'eta' con tiempo de llegada estimado. Formato: M=Metro, TU=Transurbano, ETA_S=segundos, FROM=origen, TO=destino. Los datos se procesan automáticamente en la interfaz."
+}

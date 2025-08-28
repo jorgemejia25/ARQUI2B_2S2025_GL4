@@ -7,6 +7,9 @@ class DistanceScreen extends Screen {
   // Eliminado gráfico de distancias (DistanceChart)
   private boolean isLongDistance = false;
   
+  // IDs de paradas para compatibilidad con DataProvider
+  private String[] paradaIds = {"P1", "P2", "P3", "P4", "P5", "P6"};
+  
   DistanceScreen(float x, float y, float width, float height, DataProvider dataProvider) {
     super("Monitor de Distancias", x, y, width, height);
     this.dataProvider = dataProvider;
@@ -28,7 +31,7 @@ class DistanceScreen extends Screen {
       InfoCard transmetroCard = new InfoCard(
         "Parada " + i, 
         "0 cm", 
-        Theme.BLUE, 
+        Theme.GREEN, 
         x + 40, 
         sectionY + (i-1) * cardSpacing
       );
@@ -58,8 +61,8 @@ class DistanceScreen extends Screen {
     renderModernHeader();
     
   // Secciones de transporte con diseño card-based
-    renderTransportSection("Transurbano", x + 40, y + 70, width/2 - 60, transurbanoCards, Theme.BLUE);
-    renderTransportSection("Transmetro", x + width/2 + 20, y + 70, width/2 - 60, transmetroCards, Theme.GREEN);
+    renderTransportSection("Transurbano", x + 40, y + 70, width/2 - 60, transmetroCards, Theme.BLUE);
+    renderTransportSection("Transmetro", x + width/2 + 20, y + 70, width/2 - 60, transurbanoCards, Theme.GREEN);
     
   // (Gráfico eliminado)
     
@@ -110,6 +113,11 @@ class DistanceScreen extends Screen {
     String paradaId = "P" + (card == transurbanoCards.get(0) ? "1" : 
                              card == transurbanoCards.get(1) ? "2" :
                              card == transmetroCards.get(0) ? "3" : "4");
+
+    // ETA invertido respecto al mapeo de distancia actual
+    String paradaIdEta = "P" + (card == transurbanoCards.get(0) ? "3" : 
+                                 card == transurbanoCards.get(1) ? "4" :
+                                 card == transmetroCards.get(0) ? "1" : "2");
     
     int distance = distancias.getInt(paradaId);
     boolean busPresent = distance < 30;
@@ -163,10 +171,71 @@ class DistanceScreen extends Screen {
     fill(busPresent ? accentColor : color(40, 40, 40));
     textAlign(LEFT, CENTER);
     textSize(24);
-    text(distance + " cm", cardX + 20, cardY + 70);
+    text(distance + " cm", cardX + 20, cardY + 60);
+    
+    // ETA (Tiempo de llegada estimado)
+    renderEtaInfo(cardX + 20, cardY + 75, cardWidth - 40, paradaIdEta, accentColor);
     
     // Barra de proximidad
-    renderProximityBar(cardX + 20, cardY + 85, cardWidth - 40, distance, accentColor);
+    renderProximityBar(cardX + 20, cardY + 95, cardWidth - 40, distance, accentColor);
+  }
+  
+  void renderEtaInfo(float etaX, float etaY, float etaWidth, String paradaId, color accentColor) {
+    JSONObject etaData = dataProvider.getEtaData();
+    
+    if (!etaData.hasKey(paradaId)) {
+      // Si no hay datos ETA, mostrar mensaje
+      fill(120, 120, 120);
+      textAlign(LEFT, CENTER);
+      textSize(11);
+      text("Sin datos ETA", etaX, etaY);
+      return;
+    }
+    
+    try {
+      JSONObject etaInfo = etaData.getJSONObject(paradaId);
+      int etaSeconds = etaInfo.getInt("eta_s");
+      String status = etaInfo.getString("status");
+      String type = etaInfo.getString("type");
+      
+      // Color del status
+      color statusColor;
+      if (etaSeconds < 60) {
+        statusColor = color(0, 150, 0); // Verde para próximo
+      } else if (etaSeconds < 180) {
+        statusColor = color(255, 140, 0); // Naranja para en ruta
+      } else {
+        statusColor = color(100, 100, 100); // Gris para lejano
+      }
+      
+      // Formatear tiempo
+      String timeDisplay;
+      if (etaSeconds < 60) {
+        timeDisplay = etaSeconds + "s";
+      } else {
+        int minutes = etaSeconds / 60;
+        int seconds = etaSeconds % 60;
+        timeDisplay = minutes + ":" + nf(seconds, 2);
+      }
+      
+      // Mostrar ETA
+      fill(statusColor);
+      textAlign(LEFT, CENTER);
+      textSize(12);
+      text("ETA: " + timeDisplay, etaX, etaY);
+      
+      // Mostrar status
+      fill(80, 80, 80);
+      textSize(10);
+      text(status + " • " + type, etaX, etaY + 12);
+      
+    } catch (Exception e) {
+      // En caso de error, mostrar mensaje
+      fill(120, 120, 120);
+      textAlign(LEFT, CENTER);
+      textSize(11);
+      text("Error ETA", etaX, etaY);
+    }
   }
   
   void renderProximityBar(float barX, float barY, float barWidth, int distance, color accentColor) {
@@ -236,10 +305,10 @@ class DistanceScreen extends Screen {
     
     JSONObject distancias = dataProvider.getDistanciaData();
     float[] distances = new float[4];
-    distances[0] = distancias.getInt("P1");
-    distances[1] = distancias.getInt("P2");
-    distances[2] = distancias.getInt("P3");
-    distances[3] = distancias.getInt("P4");
+    distances[0] = distancias.getInt("P3");
+    distances[1] = distancias.getInt("P4");
+    distances[2] = distancias.getInt("P1");
+    distances[3] = distancias.getInt("P2");
     
     float avgDistance = 0;
     int busesPresentes = 0;
@@ -257,10 +326,35 @@ class DistanceScreen extends Screen {
     
     fill(60, 60, 60); // Gris oscuro
     textSize(14); // Tamaño aumentado
-    text("Buses presentes: " + busesPresentes + "/4  •  Distancia promedio: " + String.format("%.0f", avgDistance) + " cm", x + 60, infoY + 35);
+    text("Buses presentes: " + busesPresentes + "/4  •  Distancia promedio: " + String.format("%.0f", avgDistance) + " cm", x + 60, infoY + 25);
+    
+    // Información de ETA
+    JSONObject etaData = dataProvider.getEtaData();
+    int busesConEta = 0;
+    int etaPromedio = 0;
+    int totalEta = 0;
+    
+    for (String paradaId : paradaIds) {
+      if (etaData.hasKey(paradaId)) {
+        try {
+          JSONObject etaInfo = etaData.getJSONObject(paradaId);
+          int etaSeconds = etaInfo.getInt("eta_s");
+          totalEta += etaSeconds;
+          busesConEta++;
+        } catch (Exception e) {}
+      }
+    }
+    
+    if (busesConEta > 0) {
+      etaPromedio = totalEta / busesConEta;
+      String etaDisplay = etaPromedio < 60 ? etaPromedio + "s" : (etaPromedio / 60) + ":" + nf(etaPromedio % 60, 2);
+      text("ETAs disponibles: " + busesConEta + "/6  •  ETA promedio: " + etaDisplay, x + 60, infoY + 40);
+    } else {
+      text("ETAs disponibles: 0/6  •  Sin datos de tiempo de llegada", x + 60, infoY + 40);
+    }
     
     JSONObject currentData = dataProvider.getCurrentData();
-    text("Última actualización: " + currentData.getString("ts"), x + 60, infoY + 50);
+    text("Última actualización: " + currentData.getString("ts"), x + 60, infoY + 55);
   }
   
   // --- NUEVO: Mapa urbano simplificado ---
@@ -292,6 +386,7 @@ class DistanceScreen extends Screen {
     stroke(Theme.GREEN); float y2 = innerY + cellH*1.5f; line(innerX + 10, y2, innerX + innerW - 10, y2);
     // Paradas mapeadas a P1..P4 sobre las rutas
     JSONObject distancias = dataProvider.getDistanciaData();
+    JSONObject etaData = dataProvider.getEtaData();
     // P1,P2 en ruta azul; P3,P4 en ruta verde
     float[] stopX = { innerX + innerW*0.2f, innerX + innerW*0.7f, innerX + innerW*0.3f, innerX + innerW*0.8f };
     float[] stopY = { y1, y1, y2, y2 };
@@ -309,7 +404,19 @@ class DistanceScreen extends Screen {
       } else {
         fill(80); ellipse(sx, sy, 8, 8);
       }
-      fill(30); text(stops[i] + "\n" + d + "cm", sx, sy + 10);
+      
+      // Mostrar información de parada con ETA
+      String stopInfo = stops[i] + "\n" + d + "cm";
+      if (etaData.hasKey(stops[i])) {
+        try {
+          JSONObject etaInfo = etaData.getJSONObject(stops[i]);
+          int etaSeconds = etaInfo.getInt("eta_s");
+          String etaDisplay = etaSeconds < 60 ? etaSeconds + "s" : (etaSeconds / 60) + ":" + nf(etaSeconds % 60, 2);
+          stopInfo += "\nETA: " + etaDisplay;
+        } catch (Exception e) {}
+      }
+      
+      fill(30); text(stopInfo, sx, sy + 10);
     }
     // Leyenda rápida
     textAlign(LEFT, CENTER); textSize(11); fill(60);

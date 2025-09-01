@@ -202,6 +202,14 @@ BEGIN
 END
 GO
 
+UPDATE b
+SET b.route_id = r.route_id
+FROM iot.Bus b
+JOIN iot.Route r ON
+       (b.code = N'BUS_TRANSMETRO'  AND r.code = N'RUTA_TRANSMETRO')
+    OR (b.code = N'BUS_TRANSURBANO' AND r.code = N'RUTA_TRANSURBANO');
+
+
 
 -- Relación rutas hacia paradas con orden
 INSERT INTO iot.RouteStop(route_id, stop_id, seq)

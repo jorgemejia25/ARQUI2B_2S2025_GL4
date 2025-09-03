@@ -1,0 +1,11 @@
+# Dependencias para el módulo de comunicación serial con Arduino
+# Instalar con: pip install -r requirements.txt
+
+# Biblioteca para comunicación serial
+pyserial>=3.5
+
+# Para desarrollo y testing (opcional)
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+# black>=22.0.0
+# flake8>=5.0.0

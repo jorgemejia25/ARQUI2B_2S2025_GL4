@@ -1,0 +1,87 @@
+{
+  "timestamp": "2025-09-02T22:15:30.123456",
+  "protocol_version": "1.0",
+  "semaforos": [
+    {
+      "id": "sem_1",
+      "estado": "verde"
+    },
+    {
+      "id": "sem_2",
+      "estado": "rojo"
+    },
+    {
+      "id": "sem_3",
+      "estado": "amarillo"
+    },
+    {
+      "id": "sem_4",
+      "estado": "verde"
+    },
+    {
+      "id": "sem_5",
+      "estado": "rojo"
+    }
+  ],
+  "distancias": [
+    {
+      "id": "dist_1",
+      "distancia_cm": 150.5
+    },
+    {
+      "id": "dist_2",
+      "distancia_cm": 8.2
+    },
+    {
+      "id": "dist_3",
+      "distancia_cm": 75.0
+    },
+    {
+      "id": "dist_4",
+      "distancia_cm": 200.0
+    }
+  ],
+  "gas": [
+    {
+      "zona": "Z1",
+      "ppm": 180,
+      "is_alto": false
+    },
+    {
+      "zona": "Z2",
+      "ppm": 520,
+      "is_alto": true
+    }
+  ],
+  "tiene_sismo": false,
+  "sismo": null,
+  "botones_panico_activos": [
+    {
+      "id": "PB1",
+      "activo": true,
+      "timestamp": "2025-09-02T22:15:30.123456",
+      "button_id": "emergency_001"
+    }
+  ],
+  "infracciones": ["S2", "S5"],
+  "eta": [
+    {
+      "parada": "P1",
+      "tipo_transporte": "Transurbano",
+      "tiempo_segundos": 45,
+      "info": "FROM=Zona Norte,TO=P1,ROUTE=Ruta1"
+    },
+    {
+      "parada": "P3",
+      "tipo_transporte": "Transmetro",
+      "tiempo_segundos": 120,
+      "info": "FROM=Estación Central,TO=P3,ROUTE=Ruta2"
+    },
+    {
+      "parada": "P4",
+      "tipo_transporte": "Transurbano",
+      "tiempo_segundos": 300,
+      "info": "FROM=Mall,TO=P4,ROUTE=Ruta3"
+    }
+  ]
+}

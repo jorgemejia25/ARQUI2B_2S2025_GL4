@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WebSocket - API IoT</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .websocket-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            background-color: white;
+        }
+        .message.alert { border-left-color: #dc3545; }
+        .message.traffic { border-left-color: #ffc107; }
+        .message.stop { border-left-color: #28a745; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button.disconnect { background-color: #dc3545; }
+        button.disconnect:hover { background-color: #c82333; }
+        .stats {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test WebSocket - API IoT</h1>
+    <p>Esta página permite probar la funcionalidad de WebSocket del API para recibir actualizaciones en tiempo real de paradas, semáforos y alertas.</p>
+    
+    <div class="container">
+        <!-- WebSocket de Paradas -->
+        <div class="websocket-section">
+            <h2>Paradas (Stops)</h2>
+            <div id="stops-status" class="status disconnected">Desconectado</div>
+            <button onclick="connectStops()">Conectar</button>
+            <button onclick="disconnectStops()" class="disconnect">Desconectar</button>
+            <div class="stats">
+                <strong>Mensajes recibidos:</strong> <span id="stops-count">0</span>
+            </div>
+            <div id="stops-messages" class="messages"></div>
+        </div>
+
+        <!-- WebSocket de Semáforos -->
+        <div class="websocket-section">
+            <h2>Semáforos (Traffic)</h2>
+            <div id="traffic-status" class="status disconnected">Desconectado</div>
+            <button onclick="connectTraffic()">Conectar</button>
+            <button onclick="disconnectTraffic()" class="disconnect">Desconectar</button>
+            <div class="stats">
+                <strong>Mensajes recibidos:</strong> <span id="traffic-count">0</span>
+            </div>
+            <div id="traffic-messages" class="messages"></div>
+        </div>
+
+        <!-- WebSocket de Alertas -->
+        <div class="websocket-section">
+            <h2>Alertas (Alerts)</h2>
+            <div id="alerts-status" class="status disconnected">Desconectado</div>
+            <button onclick="connectAlerts()">Conectar</button>
+            <button onclick="disconnectAlerts()" class="disconnect">Desconectar</button>
+            <div class="stats">
+                <strong>Mensajes recibidos:</strong> <span id="alerts-count">0</span>
+            </div>
+            <div id="alerts-messages" class="messages"></div>
+        </div>
+
+        <!-- Estadísticas del API -->
+        <div class="websocket-section">
+            <h2>Estadísticas del API</h2>
+            <button onclick="refreshStats()">Actualizar Estadísticas</button>
+            <div id="api-stats" class="stats">
+                <p>Cargando estadísticas...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stopsSocket = null;
+        let trafficSocket = null;
+        let alertsSocket = null;
+        
+        let stopsCount = 0;
+        let trafficCount = 0;
+        let alertsCount = 0;
+
+        function connectStops() {
+            if (stopsSocket && stopsSocket.readyState === WebSocket.OPEN) return;
+            
+            stopsSocket = new WebSocket('ws://localhost:8001/ws/stops');
+            
+            stopsSocket.onopen = function(event) {
+                document.getElementById('stops-status').textContent = 'Conectado';
+                document.getElementById('stops-status').className = 'status connected';
+                addMessage('stops-messages', 'Conexión establecida', 'info');
+            };
+            
+            stopsSocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                stopsCount++;
+                document.getElementById('stops-count').textContent = stopsCount;
+                addMessage('stops-messages', JSON.stringify(data, null, 2), 'stop');
+            };
+            
+            stopsSocket.onclose = function(event) {
+                document.getElementById('stops-status').textContent = 'Desconectado';
+                document.getElementById('stops-status').className = 'status disconnected';
+                addMessage('stops-messages', 'Conexión cerrada', 'info');
+            };
+            
+            stopsSocket.onerror = function(error) {
+                addMessage('stops-messages', 'Error: ' + error, 'error');
+            };
+        }
+
+        function connectTraffic() {
+            if (trafficSocket && trafficSocket.readyState === WebSocket.OPEN) return;
+            
+            trafficSocket = new WebSocket('ws://localhost:8001/ws/traffic');
+            
+            trafficSocket.onopen = function(event) {
+                document.getElementById('traffic-status').textContent = 'Conectado';
+                document.getElementById('traffic-status').className = 'status connected';
+                addMessage('traffic-messages', 'Conexión establecida', 'info');
+            };
+            
+            trafficSocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                trafficCount++;
+                document.getElementById('traffic-count').textContent = trafficCount;
+                addMessage('traffic-messages', JSON.stringify(data, null, 2), 'traffic');
+            };
+            
+            trafficSocket.onclose = function(event) {
+                document.getElementById('traffic-status').textContent = 'Desconectado';
+                document.getElementById('traffic-status').className = 'status disconnected';
+                addMessage('traffic-messages', 'Conexión cerrada', 'info');
+            };
+            
+            trafficSocket.onerror = function(error) {
+                addMessage('traffic-messages', 'Error: ' + error, 'error');
+            };
+        }
+
+        function connectAlerts() {
+            if (alertsSocket && alertsSocket.readyState === WebSocket.OPEN) return;
+            
+            alertsSocket = new WebSocket('ws://localhost:8001/ws/alerts');
+            
+            alertsSocket.onopen = function(event) {
+                document.getElementById('alerts-status').textContent = 'Conectado';
+                document.getElementById('alerts-status').className = 'status connected';
+                addMessage('alerts-messages', 'Conexión establecida', 'info');
+            };
+            
+            alertsSocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                alertsCount++;
+                document.getElementById('alerts-count').textContent = alertsCount;
+                addMessage('alerts-messages', JSON.stringify(data, null, 2), 'alert');
+            };
+            
+            alertsSocket.onclose = function(event) {
+                document.getElementById('alerts-status').textContent = 'Desconectado';
+                document.getElementById('alerts-status').className = 'status disconnected';
+                addMessage('alerts-messages', 'Conexión cerrada', 'info');
+            };
+            
+            alertsSocket.onerror = function(error) {
+                addMessage('alerts-messages', 'Error: ' + error, 'error');
+            };
+        }
+
+        function disconnectStops() {
+            if (stopsSocket) {
+                stopsSocket.close();
+                stopsSocket = null;
+            }
+        }
+
+        function disconnectTraffic() {
+            if (trafficSocket) {
+                trafficSocket.close();
+                trafficSocket = null;
+            }
+        }
+
+        function disconnectAlerts() {
+            if (alertsSocket) {
+                alertsSocket.close();
+                alertsSocket = null;
+            }
+        }
+
+        function addMessage(containerId, message, type) {
+            const container = document.getElementById(containerId);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function refreshStats() {
+            try {
+                const response = await fetch('http://localhost:8001/api/v1/debug/websocket-stats');
+                const stats = await response.json();
+                
+                document.getElementById('api-stats').innerHTML = `
+                    <h3>Estado de WebSockets</h3>
+                    <p><strong>Conexiones totales:</strong> ${stats.total_connections}</p>
+                    <p><strong>Por tipo:</strong></p>
+                    <ul>
+                        ${Object.entries(stats.connections_by_type).map(([type, count]) => 
+                            `<li>${type}: ${count}</li>`
+                        ).join('')}
+                    </ul>
+                `;
+            } catch (error) {
+                document.getElementById('api-stats').innerHTML = `
+                    <p>Error obteniendo estadísticas: ${error.message}</p>
+                `;
+            }
+        }
+
+        // Cargar estadísticas al inicio
+        window.onload = function() {
+            refreshStats();
+        };
+    </script>
+</body>
+</html>

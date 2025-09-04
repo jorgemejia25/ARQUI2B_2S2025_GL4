@@ -3,3 +3,4 @@ uvicorn[standard]==0.24.0
 paho-mqtt==1.6.1
 sqlite3
 
+

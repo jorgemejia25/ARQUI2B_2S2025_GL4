@@ -163,7 +163,13 @@ class MQTTHandler:
         try:
             logger.info("=== INICIANDO EMISIÓN WEBSOCKET ===")
             logger.info(f"Topico MQTT: {topic}")
+            logger.info(f"Tipo de payload: {type(payload)}")
             logger.info(f"Payload: {json.dumps(payload, ensure_ascii=False)}")
+            
+            # Verificar que el payload sea un diccionario
+            if not isinstance(payload, dict):
+                logger.error(f"Payload no es un diccionario: {type(payload)} - {payload}")
+                return
             
             if topic == "arduino/data":
                 # Procesar datos del Arduino
@@ -246,7 +252,192 @@ class MQTTHandler:
                     else:
                         logger.info(f"Sismo no supera umbral ({threshold} g), no se emite alerta")
                 else:
-                    logger.info("Datos del Arduino no reconocidos para emisión WebSocket")
+                    # Procesar formato de datos del Arduino con múltiples sensores
+                    logger.info("Procesando datos del Arduino con formato completo...")
+                    
+                    # Procesar semáforos
+                    if "semaforos" in payload:
+                        logger.info(f"Procesando {len(payload['semaforos'])} semáforos...")
+                        for semaforo in payload["semaforos"]:
+                            estado = semaforo.get("estado", "UNKNOWN")
+                            semaforo_id = semaforo["id"]
+                            
+                            logger.info(f"Semáforo {semaforo_id} en estado {estado} - emitiendo actualización de tráfico")
+                            
+                            # Mapear estados del Arduino a colores estándar
+                            color_mapping = {
+                                "VERDE": "green",
+                                "AMARILLO": "yellow", 
+                                "ROJO": "red"
+                            }
+                            
+                            signal_color = color_mapping.get(estado, estado.lower())
+                            
+                            # Determinar tipo de violación solo para rojo
+                            violation_type = "red_light" if estado == "ROJO" else "signal_update"
+                            
+                            traffic_data = {
+                                "timestamp": time.time(),
+                                "signal_id": semaforo_id,
+                                "signal_color": signal_color,
+                                "violation_type": violation_type,
+                                "data": {
+                                    "alert_type": "INFRACCION" if estado == "ROJO" else "SIGNAL_UPDATE",
+                                    "signal_id": semaforo_id,
+                                    "signal_color": signal_color,
+                                    "severity": 3 if estado == "ROJO" else 1
+                                }
+                            }
+                            
+                            await self.websocket_manager.emit_traffic_update(traffic_data)
+                            logger.info(f"Actualización de tráfico emitida para semáforo {semaforo_id} (estado: {estado})")
+                    
+                    # Procesar datos de ETA (tiempos de llegada de buses)
+                    if "eta" in payload and payload["eta"]:
+                        eta_data = payload["eta"]
+                        logger.info(f"Procesando {len(eta_data)} ETAs de transporte...")
+                        
+                        # Definir categorías de paradas correctas
+                        PARADAS_TRANSMETRO = ["P1", "P2"]
+                        PARADAS_TRANSURBANO = ["P3", "P4"]
+                        
+                        # El Arduino envía eta como array de objetos con información completa
+                        for eta_item in eta_data:
+                            parada = eta_item.get("parada", "unknown")
+                            tipo_transporte = eta_item.get("tipo_transporte", "unknown")
+                            tiempo_segundos = eta_item.get("tiempo_segundos", 0)
+                            info = eta_item.get("info", "")
+                            
+                            # Verificar que la parada sea válida (solo P1, P2, P3, P4)
+                            if parada not in PARADAS_TRANSMETRO + PARADAS_TRANSURBANO:
+                                logger.warning(f"Parada {parada} no válida - solo se permiten P1, P2, P3, P4")
+                                continue
+                            
+                            # Verificar que el tipo de transporte coincida con la categoría de parada
+                            if parada in PARADAS_TRANSMETRO and tipo_transporte != "Transmetro":
+                                logger.warning(f"Parada {parada} debe ser Transmetro, pero se recibió {tipo_transporte}")
+                                continue
+                            elif parada in PARADAS_TRANSURBANO and tipo_transporte != "Transurbano":
+                                logger.warning(f"Parada {parada} debe ser Transurbano, pero se recibió {tipo_transporte}")
+                                continue
+                            
+                            logger.info(f"ETA válido detectado en parada {parada}: {tipo_transporte} en {tiempo_segundos}s")
+                            
+                            # Extraer origen del string de información
+                            origen = "Desconocido"
+                            try:
+                                if "FROM=" in info:
+                                    origen_part = info.split("FROM=")[1].split(",")[0]
+                                    origen = origen_part
+                            except (IndexError, ValueError):
+                                logger.warning(f"No se pudo extraer origen de: {info}")
+                            
+                            # Emitir actualización de parada con información de ETA
+                            stop_data = {
+                                "timestamp": time.time(),
+                                "stop_id": parada,
+                                "event_type": "eta_update",
+                                "eta_info": {
+                                    "tipo_transporte": tipo_transporte,
+                                    "tiempo_segundos": tiempo_segundos,
+                                    "origen": origen,
+                                    "info": info
+                                },
+                                "data": {
+                                    "alert_type": "ETA_UPDATE",
+                                    "stop_id": parada,
+                                    "tipo_transporte": tipo_transporte,
+                                    "tiempo_segundos": tiempo_segundos,
+                                    "origen": origen,
+                                    "severity": 1
+                                }
+                            }
+                            
+                            await self.websocket_manager.emit_stop_update(stop_data)
+                            logger.info(f"Actualización de parada emitida para ETA en {parada}: {tipo_transporte} desde {origen} en {tiempo_segundos}s")
+                    
+                    # Procesar botones de pánico activos
+                    if "botones_panico_activos" in payload:
+                        logger.info(f"Procesando {len(payload['botones_panico_activos'])} botones de pánico...")
+                        for boton in payload["botones_panico_activos"]:
+                            if boton.get("activo", False):
+                                logger.info(f"Botón de pánico {boton['id']} activo - emitiendo actualización de parada")
+                                stop_data = {
+                                    "timestamp": time.time(),
+                                    "stop_id": boton["id"],
+                                    "event_type": "panic_button",
+                                    "button_id": boton.get("button_id", boton["id"]),
+                                    "data": {
+                                        "alert_type": "PANICO",
+                                        "stop_id": boton["id"],
+                                        "button_id": boton.get("button_id", boton["id"]),
+                                        "severity": 3
+                                    }
+                                }
+                                await self.websocket_manager.emit_stop_update(stop_data)
+                                logger.info(f"Actualización de parada emitida para botón {boton['id']}")
+                    
+                    # Procesar mediciones de gas
+                    if "gas" in payload:
+                        logger.info(f"Procesando {len(payload['gas'])} mediciones de gas...")
+                        for gas_measurement in payload["gas"]:
+                            ppm = gas_measurement.get("ppm", 0)
+                            is_alto = gas_measurement.get("is_alto", False)
+                            zona = gas_measurement.get("zona", "unknown")
+                            
+                            if is_alto or ppm > 100:  # Umbral de 100 ppm
+                                logger.info(f"Gas alto detectado en {zona}: {ppm} ppm - emitiendo alerta")
+                                alert_data = {
+                                    "timestamp": time.time(),
+                                    "alert_type": "GAS_ALERT",
+                                    "severity": 3,
+                                    "data": {
+                                        "gas_ppm": ppm,
+                                        "threshold_ppm": 100.0,
+                                        "zona": zona,
+                                        "is_alto": is_alto
+                                    }
+                                }
+                                await self.websocket_manager.emit_alert(alert_data)
+                                logger.info(f"Alerta de gas emitida para zona {zona}")
+                    
+                    # Procesar detección de sismo
+                    if "tiene_sismo" in payload and payload["tiene_sismo"]:
+                        logger.info("Sismo detectado - emitiendo alerta sísmica")
+                        alert_data = {
+                            "timestamp": time.time(),
+                            "alert_type": "SEISMIC_ALERT",
+                            "severity": 3,
+                            "data": {
+                                "seismic_intensity": payload.get("sismo", {}).get("intensity", 3.0),
+                                "threshold_g": 2.0,
+                                "tiene_sismo": True
+                            }
+                        }
+                        await self.websocket_manager.emit_alert(alert_data)
+                        logger.info("Alerta sísmica emitida exitosamente")
+                    
+                    # Procesar infracciones
+                    if "infracciones" in payload and len(payload["infracciones"]) > 0:
+                        logger.info(f"Procesando {len(payload['infracciones'])} infracciones...")
+                        for infraccion in payload["infracciones"]:
+                            logger.info(f"Infracción detectada: {infraccion}")
+                            traffic_data = {
+                                "timestamp": time.time(),
+                                "signal_id": infraccion.get("signal_id", "unknown"),
+                                "signal_color": infraccion.get("signal_color", "red"),
+                                "violation_type": infraccion.get("violation_type", "red_light"),
+                                "data": {
+                                    "alert_type": "INFRACCION",
+                                    "signal_id": infraccion.get("signal_id", "unknown"),
+                                    "signal_color": infraccion.get("signal_color", "red"),
+                                    "severity": 3
+                                }
+                            }
+                            await self.websocket_manager.emit_traffic_update(traffic_data)
+                            logger.info(f"Actualización de tráfico emitida para infracción en {infraccion.get('signal_id')}")
+                    
+                    logger.info("Procesamiento completo de datos del Arduino finalizado")
                     
             logger.info("=== FINALIZADA EMISIÓN WEBSOCKET ===")
                         

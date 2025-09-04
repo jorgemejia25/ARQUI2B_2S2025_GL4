@@ -1,0 +1,298 @@
+import json
+import time
+import logging
+import asyncio
+from typing import List, Dict, Any
+import paho.mqtt.client as mqtt
+from database import DatabaseManager
+
+logger = logging.getLogger(__name__)
+
+class MQTTHandler:
+    def __init__(self, broker: str, port: int, topics: List[str], websocket_manager=None):
+        self.broker = broker
+        self.port = port
+        self.topics = topics
+        self.client = mqtt.Client()
+        self.received_data = []
+        self.db_manager = DatabaseManager()
+        self.websocket_manager = websocket_manager
+        
+        # Configurar callbacks
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.client.on_disconnect = self.on_disconnect
+        
+    def on_connect(self, client, userdata, flags, rc):
+        """Callback cuando se conecta al broker MQTT"""
+        logger.info(f"Conectado a MQTT broker con código: {rc}")
+        
+        # Suscribirse a todos los tópicos
+        for topic in self.topics:
+            client.subscribe(topic)
+            logger.info(f"Suscrito a: {topic}")
+    
+    def on_message(self, client, userdata, msg):
+        """Callback cuando se recibe un mensaje MQTT"""
+        try:
+            # Decodificar el mensaje JSON
+            payload = json.loads(msg.payload.decode('utf-8'))
+            topic = msg.topic
+            
+            # Crear estructura de datos recibida
+            data_received = {
+                "timestamp": time.time(),
+                "topic": topic,
+                "payload": payload
+            }
+            
+            # Agregar a la lista de datos recibidos
+            self.received_data.append(data_received)
+            
+            # Imprimir el JSON recibido de manera visible
+            print("\n" + "="*60)
+            print("DATOS MQTT RECIBIDOS")
+            print("="*60)
+            print(f"Topico: {topic}")
+            print(f"Timestamp: {time.time():.2f}")
+            print(f"Datos recibidos:")
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            print("="*60)
+            print()
+            
+            # Loggear para archivos
+            logger.info("=== DATO MQTT RECIBIDO ===")
+            logger.info(f"Topico: {topic}")
+            logger.info(f"Payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
+            logger.info("==========================")
+            
+            # Guardar en la base de datos
+            try:
+                success = self.db_manager.save_mqtt_data(topic, payload)
+                if success:
+                    logger.info(f"Datos guardados exitosamente en BD para topico: {topic}")
+                    
+                    # Emitir por WebSocket si es relevante
+                    if self.websocket_manager:
+                        # Usar asyncio.run_coroutine_threadsafe para ejecutar async desde hilo no-async
+                        try:
+                            loop = asyncio.get_event_loop()
+                            if loop.is_running():
+                                # Si estamos en el hilo principal, ejecutar directamente
+                                asyncio.create_task(self._emit_websocket_data(topic, payload))
+                            else:
+                                # Si estamos en un hilo separado, usar run_coroutine_threadsafe
+                                future = asyncio.run_coroutine_threadsafe(
+                                    self._emit_websocket_data(topic, payload), loop
+                                )
+                        except RuntimeError:
+                            # Si no hay event loop, crear uno nuevo
+                            asyncio.run(self._emit_websocket_data(topic, payload))
+                else:
+                    logger.warning(f"Error guardando datos en BD para topico: {topic}")
+            except Exception as e:
+                logger.error(f"Excepcion guardando datos en BD: {e}")
+            
+        except json.JSONDecodeError as e:
+            error_msg = f"Error decodificando JSON del topico {msg.topic}: {e}"
+            print(f"ERROR: {error_msg}")
+            logger.error(error_msg)
+        except Exception as e:
+            error_msg = f"Error procesando mensaje MQTT: {e}"
+            print(f"ERROR: {error_msg}")
+            logger.error(error_msg)
+    
+    def on_disconnect(self, client, userdata, rc):
+        """Callback cuando se desconecta del broker MQTT"""
+        logger.warning(f"Desconectado del broker MQTT con código: {rc}")
+        if rc != 0:
+            logger.info("Reintentando conexión...")
+            client.reconnect()
+    
+    def connect(self):
+        """Conectar al broker MQTT"""
+        try:
+            self.client.connect(self.broker, self.port, 60)
+            self.client.loop_start()
+            logger.info(f"Conectado a MQTT broker {self.broker}:{self.port}")
+            return True
+        except Exception as e:
+            logger.error(f"Error conectando a MQTT broker: {e}")
+            return False
+    
+    def disconnect(self):
+        """Desconectar del broker MQTT"""
+        try:
+            self.client.loop_stop()
+            self.client.disconnect()
+            logger.info("Conexión MQTT cerrada")
+            return True
+        except Exception as e:
+            logger.error(f"Error cerrando conexión MQTT: {e}")
+            return False
+    
+    def is_connected(self) -> bool:
+        """Verificar si está conectado al broker"""
+        return self.client.is_connected()
+    
+    def get_client_id(self) -> str:
+        """Obtener el ID del cliente MQTT"""
+        if self.client._client_id:
+            return self.client._client_id.decode()
+        return "Unknown"
+    
+    def get_received_data(self) -> List[Dict[str, Any]]:
+        """Obtener los datos recibidos"""
+        return self.received_data
+    
+    def get_total_received(self) -> int:
+        """Obtener el total de mensajes recibidos"""
+        return len(self.received_data)
+    
+    def get_last_messages(self, count: int = 10) -> List[Dict[str, Any]]:
+        """Obtener los últimos N mensajes recibidos"""
+        return self.received_data[-count:] if self.received_data else []
+    
+    def clear_received_data(self):
+        """Limpiar el historial de datos recibidos"""
+        self.received_data.clear()
+        logger.info("Historial de datos MQTT limpiado")
+    
+    async def _emit_websocket_data(self, topic: str, payload: Dict[str, Any]):
+        """Emitir datos por WebSocket según el tipo de información"""
+        try:
+            logger.info("=== INICIANDO EMISIÓN WEBSOCKET ===")
+            logger.info(f"Topico MQTT: {topic}")
+            logger.info(f"Payload: {json.dumps(payload, ensure_ascii=False)}")
+            
+            if topic == "arduino/data":
+                # Procesar datos del Arduino
+                if "alert_type" in payload:
+                    logger.info(f"Procesando alerta tipo: {payload['alert_type']}")
+                    
+                    # Es una alerta
+                    alert_data = {
+                        "timestamp": time.time(),
+                        "alert_type": payload["alert_type"],
+                        "severity": payload.get("severity", 2),
+                        "data": payload
+                    }
+                    
+                    # Emitir alerta general
+                    logger.info("Emitiendo alerta general por WebSocket...")
+                    await self.websocket_manager.emit_alert(alert_data)
+                    logger.info("Alerta general emitida exitosamente")
+                    
+                    # Emitir por tipo específico
+                    if payload["alert_type"] == "INFRACCION":
+                        logger.info("Procesando infracción de semáforo...")
+                        # Actualización de semáforo
+                        traffic_data = {
+                            "timestamp": time.time(),
+                            "signal_id": payload.get("signal_id", "unknown"),
+                            "signal_color": payload.get("signal_color", "red"),
+                            "violation_type": "red_light",
+                            "data": payload
+                        }
+                        logger.info(f"Emitiendo actualización de semáforo: {traffic_data['signal_id']}")
+                        await self.websocket_manager.emit_traffic_update(traffic_data)
+                        logger.info("Actualización de semáforo emitida exitosamente")
+                        
+                    elif payload["alert_type"] == "PANICO":
+                        logger.info("Procesando botón de pánico...")
+                        # Actualización de parada (botón de pánico)
+                        stop_data = {
+                            "timestamp": time.time(),
+                            "stop_id": payload.get("stop_id", "unknown"),
+                            "event_type": "panic_button",
+                            "button_id": payload.get("button_id", 1),
+                            "data": payload
+                        }
+                        logger.info(f"Emitiendo actualización de parada: {stop_data['stop_id']}")
+                        await self.websocket_manager.emit_stop_update(stop_data)
+                        logger.info("Actualización de parada emitida exitosamente")
+                        
+                elif "gas_ppm" in payload:
+                    logger.info(f"Procesando medición de gas: {payload['gas_ppm']} ppm")
+                    # Alerta de gas (si supera umbral)
+                    threshold = payload.get("threshold_ppm", 100.0)
+                    if payload["gas_ppm"] > threshold:
+                        logger.info(f"Gas supera umbral ({threshold} ppm), emitiendo alerta...")
+                        alert_data = {
+                            "timestamp": time.time(),
+                            "alert_type": "GAS_ALERT",
+                            "severity": 3,
+                            "data": payload
+                        }
+                        await self.websocket_manager.emit_alert(alert_data)
+                        logger.info("Alerta de gas emitida exitosamente")
+                    else:
+                        logger.info(f"Gas no supera umbral ({threshold} ppm), no se emite alerta")
+                        
+                elif "seismic_intensity" in payload:
+                    logger.info(f"Procesando medición sísmica: {payload['seismic_intensity']} g")
+                    # Alerta sísmica (si supera umbral)
+                    threshold = payload.get("threshold_g", 2.0)
+                    if payload["seismic_intensity"] > threshold:
+                        logger.info(f"Sismo supera umbral ({threshold} g), emitiendo alerta...")
+                        alert_data = {
+                            "timestamp": time.time(),
+                            "alert_type": "SEISMIC_ALERT",
+                            "severity": 3,
+                            "data": payload
+                        }
+                        await self.websocket_manager.emit_alert(alert_data)
+                        logger.info("Alerta sísmica emitida exitosamente")
+                    else:
+                        logger.info(f"Sismo no supera umbral ({threshold} g), no se emite alerta")
+                else:
+                    logger.info("Datos del Arduino no reconocidos para emisión WebSocket")
+                    
+            logger.info("=== FINALIZADA EMISIÓN WEBSOCKET ===")
+                        
+        except Exception as e:
+            logger.error(f"Error emitiendo datos por WebSocket: {e}")
+            logger.error("=== ERROR EN EMISIÓN WEBSOCKET ===")
+    
+    def get_database_stats(self) -> Dict[str, Any]:
+        """Obtener estadísticas de la base de datos"""
+        try:
+            # Conectar a la base de datos
+            if not self.db_manager.connect():
+                return {"error": "No se pudo conectar a la base de datos"}
+            
+            # Obtener estadísticas básicas
+            stats = {
+                "database_path": self.db_manager.db_path,
+                "connected": self.db_manager.connection is not None
+            }
+            
+            # Obtener conteo de registros en tablas principales
+            try:
+                # Contar alertas
+                alert_count = self.db_manager.execute_query("SELECT COUNT(*) as count FROM Alert")
+                if alert_count:
+                    stats["total_alerts"] = alert_count[0]["count"]
+                
+                # Contar posiciones de buses
+                bus_pos_count = self.db_manager.execute_query("SELECT COUNT(*) as count FROM BusPosition")
+                if bus_pos_count:
+                    stats["total_bus_positions"] = bus_pos_count[0]["count"]
+                
+                # Contar mediciones de gas
+                gas_count = self.db_manager.execute_query("SELECT COUNT(*) as count FROM GasMeasurement")
+                if gas_count:
+                    stats["total_gas_measurements"] = gas_count[0]["count"]
+                
+                # Contar mediciones sísmicas
+                seismic_count = self.db_manager.execute_query("SELECT COUNT(*) as count FROM SeismicMeasurement")
+                if seismic_count:
+                    stats["total_seismic_measurements"] = seismic_count[0]["count"]
+                    
+            except Exception as e:
+                stats["error"] = f"Error obteniendo estadísticas: {e}"
+            
+            return stats
+            
+        except Exception as e:
+            return {"error": f"Error general: {e}"}

@@ -116,19 +116,20 @@ class ArduinoSimulator:
     def generate_gas_data(self) -> Dict[str, int]:
         """Genera datos de sensores de gas simulados."""
         gas_data = {}
-        
-        # Zona 1 - más probabilidad de gas alto
-        if random.random() < 0.2:  # 20% de probabilidad
-            gas_data['Z1'] = random.randint(250, 350)
+
+        # Ambos sensores usan el mismo mapeo que Arduino: analogRead(0-1023) -> ppm(150-300)
+        # Zona 1 - simula diferentes niveles de gas
+        if random.random() < 0.15:  # 15% de probabilidad de gas alto
+            gas_data['Z1'] = random.randint(250, 300)
         else:
-            gas_data['Z1'] = random.randint(150, 240)
-        
-        # Zona 2 - menos probabilidad de gas alto
-        if random.random() < 0.1:  # 10% de probabilidad
+            gas_data['Z1'] = random.randint(150, 249)
+
+        # Zona 2 - simula diferentes niveles de gas
+        if random.random() < 0.10:  # 10% de probabilidad de gas alto
             gas_data['Z2'] = random.randint(250, 300)
         else:
-            gas_data['Z2'] = random.randint(160, 230)
-        
+            gas_data['Z2'] = random.randint(150, 249)
+
         return gas_data
     
     def update_earthquake_simulation(self):
@@ -162,15 +163,20 @@ class ArduinoSimulator:
         """Actualiza la simulación de infracciones."""
         # Limpiar infracciones antiguas
         self.active_violations.clear()
-        
-        # 15% de probabilidad de tener infracciones
-        if random.random() < 0.15:
-            # Generar 1-3 infracciones aleatorias
-            num_violations = random.randint(1, 3)
-            possible_semaphores = ['S2', 'S4', 'S5', 'S8', 'S10']
-            
+
+        # Simular infracciones solo cuando hay semáforos en rojo (como Arduino real)
+        red_semaphores = []
+        for i in range(1, 11):
+            sem_id = f"S{i}"
+            if self.get_traffic_light_state(sem_id) == "ROJO":
+                red_semaphores.append(sem_id)
+
+        # Si hay semáforos en rojo, 10% de probabilidad de infracción
+        if red_semaphores and random.random() < 0.10:
+            # Generar 1-2 infracciones en semáforos rojos
+            num_violations = random.randint(1, 2)
             for _ in range(num_violations):
-                semaphore = random.choice(possible_semaphores)
+                semaphore = random.choice(red_semaphores)
                 self.active_violations.add(semaphore)
     
     def update_eta_simulation(self):

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cliente WebSocket - API IoT</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #555;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        
+        .connection-panel {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .connect-btn {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .disconnect-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .messages {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-left: 3px solid #007bff;
+            background-color: white;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .message-header {
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        
+        .message-time {
+            font-size: 0.8em;
+            color: #666;
+        }
+        
+        .message-data {
+            font-family: monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            background-color: #f8f9fa;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .clear-btn {
+            background-color: #6c757d;
+            color: white;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 Cliente WebSocket - API IoT</h1>
+    <p style="text-align: center; color: #666;">
+        Conectándose a Raspberry Pi: <strong>192.168.1.181:8001</strong>
+    </p>
+
+    <div class="container">
+        <h2>🛑 Paradas de Bus</h2>
+        <div class="connection-panel">
+            <button class="connect-btn" onclick="connectStops()">Conectar</button>
+            <button class="disconnect-btn" onclick="disconnectStops()">Desconectar</button>
+            <div id="stops-status" class="status disconnected">Desconectado</div>
+        </div>
+        <div id="stops-messages" class="messages"></div>
+        <button class="clear-btn" onclick="clearMessages('stops')">Limpiar Mensajes</button>
+    </div>
+
+    <div class="container">
+        <h2>🚦 Semáforos</h2>
+        <div class="connection-panel">
+            <button class="connect-btn" onclick="connectTraffic()">Conectar</button>
+            <button class="disconnect-btn" onclick="disconnectTraffic()">Desconectar</button>
+            <div id="traffic-status" class="status disconnected">Desconectado</div>
+        </div>
+        <div id="traffic-messages" class="messages"></div>
+        <button class="clear-btn" onclick="clearMessages('traffic')">Limpiar Mensajes</button>
+    </div>
+
+    <div class="container">
+        <h2>🚨 Alertas Generales</h2>
+        <div class="connection-panel">
+            <button class="connect-btn" onclick="connectAlerts()">Conectar</button>
+            <button class="disconnect-btn" onclick="disconnectAlerts()">Desconectar</button>
+            <div id="alerts-status" class="status disconnected">Desconectado</div>
+        </div>
+        <div id="alerts-messages" class="messages"></div>
+        <button class="clear-btn" onclick="clearMessages('alerts')">Limpiar Mensajes</button>
+    </div>
+
+    <div class="container">
+        <h2>📊 Estadísticas</h2>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-messages">0</div>
+                <div class="stat-label">Total Mensajes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="active-connections">0</div>
+                <div class="stat-label">Conexiones Activas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="stops-count">0</div>
+                <div class="stat-label">Mensajes Paradas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="traffic-count">0</div>
+                <div class="stat-label">Mensajes Semáforos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="alerts-count">0</div>
+                <div class="stat-label">Mensajes Alertas</div>
+            </div>
+        </div>
+        <button class="clear-btn" onclick="clearAllStats()">Limpiar Estadísticas</button>
+    </div>
+
+    <script>
+        // Variables globales
+        let stopsSocket = null;
+        let trafficSocket = null;
+        let alertsSocket = null;
+        
+        let messageCounts = {
+            stops: 0,
+            traffic: 0,
+            alerts: 0,
+            total: 0
+        };
+
+        // URLs de WebSocket
+        const WS_URLS = {
+            stops: 'ws://192.168.1.181:8001/ws/stops',
+            traffic: 'ws://192.168.1.181:8001/ws/traffic',
+            alerts: 'ws://192.168.1.181:8001/ws/alerts'
+        };
+
+        // Función para conectar a paradas
+        function connectStops() {
+            if (stopsSocket && stopsSocket.readyState === WebSocket.OPEN) {
+                alert('Ya estás conectado a paradas');
+                return;
+            }
+
+            stopsSocket = new WebSocket(WS_URLS.stops);
+            setupSocketHandlers(stopsSocket, 'stops');
+        }
+
+        // Función para conectar a semáforos
+        function connectTraffic() {
+            if (trafficSocket && trafficSocket.readyState === WebSocket.OPEN) {
+                alert('Ya estás conectado a semáforos');
+                return;
+            }
+
+            trafficSocket = new WebSocket(WS_URLS.traffic);
+            setupSocketHandlers(trafficSocket, 'traffic');
+        }
+
+        // Función para conectar a alertas
+        function connectAlerts() {
+            if (alertsSocket && alertsSocket.readyState === WebSocket.OPEN) {
+                alert('Ya estás conectado a alertas');
+                return;
+            }
+
+            alertsSocket = new WebSocket(WS_URLS.alerts);
+            setupSocketHandlers(alertsSocket, 'alerts');
+        }
+
+        // Configurar manejadores de eventos para WebSocket
+        function setupSocketHandlers(socket, type) {
+            socket.onopen = function(event) {
+                updateStatus(type, 'connected');
+                updateActiveConnections();
+                console.log(`Conectado a ${type}`);
+            };
+
+            socket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMessage(type, data);
+                    updateStats(type);
+                } catch (error) {
+                    console.error('Error parseando mensaje:', error);
+                }
+            };
+
+            socket.onclose = function(event) {
+                updateStatus(type, 'disconnected');
+                updateActiveConnections();
+                console.log(`Desconectado de ${type}`);
+            };
+
+            socket.onerror = function(error) {
+                console.error(`Error en ${type}:`, error);
+                updateStatus(type, 'error');
+            };
+        }
+
+        // Función para desconectar
+        function disconnectStops() {
+            if (stopsSocket) {
+                stopsSocket.close();
+                stopsSocket = null;
+            }
+        }
+
+        function disconnectTraffic() {
+            if (trafficSocket) {
+                trafficSocket.close();
+                trafficSocket = null;
+            }
+        }
+
+        function disconnectAlerts() {
+            if (alertsSocket) {
+                alertsSocket.close();
+                alertsSocket = null;
+            }
+        }
+
+        // Actualizar estado visual
+        function updateStatus(type, status) {
+            const statusElement = document.getElementById(`${type}-status`);
+            statusElement.textContent = status === 'connected' ? 'Conectado' : 
+                                      status === 'error' ? 'Error' : 'Desconectado';
+            statusElement.className = `status ${status === 'connected' ? 'connected' : 'disconnected'}`;
+        }
+
+        // Agregar mensaje a la interfaz
+        function addMessage(type, data) {
+            const messagesContainer = document.getElementById(`${type}-messages`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            
+            const timestamp = new Date(data.timestamp * 1000).toLocaleString();
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">${data.type}</div>
+                <div class="message-time">${timestamp}</div>
+                <div class="message-data">${JSON.stringify(data.data, null, 2)}</div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Actualizar estadísticas
+        function updateStats(type) {
+            messageCounts[type]++;
+            messageCounts.total++;
+            
+            document.getElementById(`${type}-count`).textContent = messageCounts[type];
+            document.getElementById('total-messages').textContent = messageCounts.total;
+        }
+
+        // Actualizar conexiones activas
+        function updateActiveConnections() {
+            let active = 0;
+            if (stopsSocket && stopsSocket.readyState === WebSocket.OPEN) active++;
+            if (trafficSocket && trafficSocket.readyState === WebSocket.OPEN) active++;
+            if (alertsSocket && alertsSocket.readyState === WebSocket.OPEN) active++;
+            
+            document.getElementById('active-connections').textContent = active;
+        }
+
+        // Limpiar mensajes
+        function clearMessages(type) {
+            document.getElementById(`${type}-messages`).innerHTML = '';
+        }
+
+        // Limpiar todas las estadísticas
+        function clearAllStats() {
+            messageCounts = { stops: 0, traffic: 0, alerts: 0, total: 0 };
+            document.getElementById('total-messages').textContent = '0';
+            document.getElementById('stops-count').textContent = '0';
+            document.getElementById('traffic-count').textContent = '0';
+            document.getElementById('alerts-count').textContent = '0';
+            
+            // Limpiar todos los mensajes
+            clearMessages('stops');
+            clearMessages('traffic');
+            clearMessages('alerts');
+        }
+
+        // Conectar automáticamente al cargar la página
+        window.onload = function() {
+            console.log('Página cargada. Listo para conectar a WebSockets.');
+            console.log('URLs disponibles:');
+            console.log('- Paradas:', WS_URLS.stops);
+            console.log('- Semáforos:', WS_URLS.traffic);
+            console.log('- Alertas:', WS_URLS.alerts);
+        };
+
+        // Limpiar conexiones al cerrar la página
+        window.onbeforeunload = function() {
+            disconnectStops();
+            disconnectTraffic();
+            disconnectAlerts();
+        };
+    </script>
+</body>
+</html>
+

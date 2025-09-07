@@ -27,14 +27,9 @@ class WebSocketService {
   /// Conectar al WebSocket
   Future<void> connect() async {
     try {
-      print('🔌 Conectando a WebSocket: $_url');
-      print('🔍 URI parseada: ${Uri.parse(_url)}');
-
       _channel = WebSocketChannel.connect(Uri.parse(_url));
-      print('📡 Canal WebSocket creado');
 
       _isConnected = true;
-      print('✅ Estado de conexión establecido como true');
 
       // Escuchar mensajes
       _subscription = _channel!.stream.listen(
@@ -42,15 +37,12 @@ class WebSocketService {
         onError: _handleError,
         onDone: _handleDisconnection,
       );
-      print('👂 Suscripción a mensajes establecida');
 
       onConnected?.call();
-      print('✅ WebSocket conectado exitosamente');
 
       // Enviar un mensaje de prueba para verificar la conexión
       _sendTestMessage();
     } catch (e) {
-      print('❌ Error conectando WebSocket: $e');
       _isConnected = false;
       onError?.call('Error de conexión: $e');
     }
@@ -59,12 +51,10 @@ class WebSocketService {
   /// Enviar mensaje de prueba
   void _sendTestMessage() {
     try {
-      print('🧪 Enviando mensaje de prueba...');
       final testMessage = '{"type": "test", "message": "Hello from Flutter"}';
       _channel?.sink.add(testMessage);
-      print('📤 Mensaje de prueba enviado: $testMessage');
     } catch (e) {
-      print('❌ Error enviando mensaje de prueba: $e');
+      // Error enviando mensaje de prueba
     }
   }
 
@@ -75,49 +65,36 @@ class WebSocketService {
       await _channel?.sink.close();
       _isConnected = false;
       onDisconnected?.call();
-      print('🔌 WebSocket desconectado');
     } catch (e) {
-      print('❌ Error desconectando WebSocket: $e');
+      // Error desconectando WebSocket
     }
   }
 
   /// Manejar mensajes recibidos
   void _handleMessage(dynamic message) {
     try {
-      print('📨 Mensaje recibido: $message');
-      print('📨 Tipo de mensaje: ${message.runtimeType}');
-      print('📨 Longitud del mensaje: ${message.toString().length}');
-
       final Map<String, dynamic> jsonData = json.decode(message);
-      print('📨 JSON decodificado: $jsonData');
 
       final String messageType = jsonData['type'] as String? ?? 'unknown';
-      print('📨 Tipo de mensaje identificado: $messageType');
 
       // Manejar diferentes tipos de mensajes
       switch (messageType) {
         case 'traffic_update':
-          print('🚦 Procesando mensaje de tráfico...');
           _handleTrafficUpdateMessage(jsonData);
           break;
         case 'eta_update':
-          print('🚌 Procesando mensaje de ETA...');
           _handleEtaUpdateMessage(jsonData);
           break;
         case 'connection_established':
-          print('🔗 Procesando mensaje de conexión...');
           _handleConnectionEstablishedMessage(jsonData);
           break;
         case 'test':
-          print('🧪 Mensaje de prueba recibido');
           break;
         default:
-          print('⚠️ Tipo de mensaje no reconocido: $messageType');
-          print('⚠️ Contenido completo: $jsonData');
+          // Tipo de mensaje no reconocido
+          break;
       }
     } catch (e) {
-      print('❌ Error procesando mensaje: $e');
-      print('❌ Mensaje que causó el error: $message');
       onError?.call('Error procesando mensaje: $e');
     }
   }
@@ -125,20 +102,14 @@ class WebSocketService {
   /// Manejar mensaje de actualización de tráfico
   void _handleTrafficUpdateMessage(Map<String, dynamic> jsonData) {
     try {
-      print('🚦 Procesando mensaje de tráfico...');
-
       // Extraer datos directamente del formato del servidor
       final data = jsonData['data'] as Map<String, dynamic>;
       final signalId = data['signal_id'] as String;
       final signalColor = data['signal_color'] as String;
 
-      print('🚦 Datos extraídos: $signalId -> $signalColor');
-
       // Procesar directamente sin usar el modelo WebSocketMessage
       _processTrafficUpdateDirect(signalId, signalColor, jsonData);
     } catch (e) {
-      print('❌ Error procesando mensaje de tráfico: $e');
-      print('❌ Datos del mensaje: $jsonData');
       onError?.call('Error procesando mensaje de tráfico: $e');
     }
   }
@@ -149,8 +120,6 @@ class WebSocketService {
     String signalColor,
     Map<String, dynamic> fullMessage,
   ) {
-    print('🚦 Procesando actualización directa: $signalId -> $signalColor');
-
     // Extraer datos adicionales del mensaje completo
     final data = fullMessage['data'] as Map<String, dynamic>;
     final violationType = data['violation_type'] as String? ?? 'signal_update';
@@ -159,32 +128,18 @@ class WebSocketService {
         : 'SIGNAL_UPDATE';
     final severity = violationType == 'red_light' ? 3 : 1;
 
-    print(
-      '📊 Datos del mensaje: violationType=$violationType, alertType=$alertType, severity=$severity',
-    );
-
     // Mapear el ID del semáforo del WebSocket al ID del SVG
     final svgId = _mapSignalIdToSvgId(signalId);
-    print('🔍 ID mapeado: $signalId -> $svgId');
-
     if (svgId == null) {
-      print('⚠️ ID de semáforo no reconocido: $signalId');
       return;
     }
 
     // Mapear el color del WebSocket al estado del semáforo
     final trafficState = _mapColorToTrafficState(signalColor);
-    print('🎨 Color mapeado: $signalColor -> $trafficState');
 
     if (trafficState == null) {
-      print('⚠️ Color de semáforo no reconocido: $signalColor');
       return;
     }
-
-    print(
-      '🔄 Actualizando semáforo $svgId a estado $trafficState (severity: $severity)',
-    );
-    print('📞 Llamando callback onTrafficUpdate...');
 
     // Crear un mensaje simplificado para el callback
     final simplifiedMessage = WebSocketMessage(
@@ -209,24 +164,16 @@ class WebSocketService {
 
   /// Manejar mensaje de conexión establecida
   void _handleConnectionEstablishedMessage(Map<String, dynamic> jsonData) {
-    print('✅ Conexión WebSocket establecida: ${jsonData['message']}');
     // No necesitamos procesar este mensaje, solo confirmar la conexión
   }
 
   /// Manejar mensaje de actualización de ETA
   void _handleEtaUpdateMessage(Map<String, dynamic> jsonData) {
     try {
-      print('🚌 Procesando mensaje de ETA...');
-
       final EtaUpdateMessage etaMessage = EtaUpdateMessage.fromJson(jsonData);
-      print(
-        '🚌 ETA procesado: ${etaMessage.data.stopId} - ${etaMessage.data.tipoTransporte} - ${etaMessage.data.tiempoFormateado}',
-      );
 
       onEtaUpdate?.call(etaMessage);
     } catch (e) {
-      print('❌ Error procesando mensaje de ETA: $e');
-      print('❌ Datos del mensaje: $jsonData');
       onError?.call('Error procesando mensaje de ETA: $e');
     }
   }
@@ -275,16 +222,12 @@ class WebSocketService {
 
   /// Manejar errores
   void _handleError(dynamic error) {
-    print('❌ Error en WebSocket: $error');
-    print('❌ Tipo de error: ${error.runtimeType}');
-    print('❌ Stack trace: ${StackTrace.current}');
     _isConnected = false;
     onError?.call('Error en WebSocket: $error');
   }
 
   /// Manejar desconexión
   void _handleDisconnection() {
-    print('🔌 WebSocket desconectado');
     _isConnected = false;
     onDisconnected?.call();
   }
@@ -293,15 +236,12 @@ class WebSocketService {
   void sendMessage(String message) {
     if (_isConnected && _channel != null) {
       _channel!.sink.add(message);
-    } else {
-      print('⚠️ No se puede enviar mensaje: WebSocket no conectado');
     }
   }
 
   /// Cambiar URL del WebSocket
   void setUrl(String url) {
     _url = url;
-    print('🔧 URL del WebSocket actualizada: $_url');
   }
 
   /// Obtener estado de conexión
@@ -316,21 +256,15 @@ class WebSocketService {
   /// Verificar conectividad de red
   Future<bool> checkNetworkConnectivity() async {
     try {
-      print('🌐 Verificando conectividad de red...');
-      final uri = Uri.parse(_url);
-      print('🌐 Host: ${uri.host}');
-      print('🌐 Puerto: ${uri.port}');
-      print('🌐 Esquema: ${uri.scheme}');
+      Uri.parse(_url);
       return true;
     } catch (e) {
-      print('❌ Error verificando conectividad: $e');
       return false;
     }
   }
 
   /// Reconectar manualmente
   Future<void> reconnect() async {
-    print('🔄 Reconectando WebSocket...');
     await disconnect();
     await Future.delayed(const Duration(seconds: 2));
     await connect();
@@ -338,7 +272,6 @@ class WebSocketService {
 
   /// Simular mensaje de tráfico para pruebas
   void simulateTrafficMessage() {
-    print('🧪 Simulando mensaje de tráfico...');
     final simulatedMessage = {
       "type": "traffic_update",
       "timestamp": DateTime.now().millisecondsSinceEpoch / 1000.0,
@@ -357,13 +290,11 @@ class WebSocketService {
     };
 
     final jsonString = json.encode(simulatedMessage);
-    print('🧪 Mensaje simulado: $jsonString');
     _handleMessage(jsonString);
   }
 
   /// Solicitar actualización de tráfico al servidor
   void requestTrafficUpdate() {
-    print('📡 Solicitando actualización de tráfico...');
     final requestMessage = {
       "type": "request_traffic_update",
       "timestamp": DateTime.now().millisecondsSinceEpoch / 1000.0,

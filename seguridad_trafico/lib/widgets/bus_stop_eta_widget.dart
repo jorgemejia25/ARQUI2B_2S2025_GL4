@@ -44,7 +44,7 @@ class BusStopEtaWidget extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 120),
       child: Card(
         elevation: 4,
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

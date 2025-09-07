@@ -4,9 +4,11 @@ import 'dart:async';
 import '../services/svg_traffic_service.dart';
 import '../services/websocket_service.dart';
 import '../services/bus_stop_service.dart';
+import '../services/bus_stop_websocket_service.dart';
 import '../models/websocket_message.dart';
 import '../models/traffic_light.dart';
 import 'bus_stop_eta_widget.dart';
+import 'eta_info_modal.dart';
 
 class MapContainer extends StatefulWidget {
   const MapContainer({super.key});
@@ -20,8 +22,14 @@ class _MapContainerState extends State<MapContainer> {
   bool _isLoading = true;
   Timer? _simulationTimer;
   final WebSocketService _webSocketService = WebSocketService.instance;
+  final BusStopWebSocketService _busStopWebSocketService =
+      BusStopWebSocketService.instance;
   final BusStopService _busStopService = BusStopService.instance;
   StreamSubscription<Map<String, BusStopEtaInfo>>? _busStopsSubscription;
+
+  // Controlador para el zoom del mapa
+  final TransformationController _transformationController =
+      TransformationController();
 
   @override
   void initState() {
@@ -35,7 +43,9 @@ class _MapContainerState extends State<MapContainer> {
     _simulationTimer?.cancel();
     _busStopsSubscription?.cancel();
     _busStopService.stopEtaCleanup();
+    _transformationController.dispose();
     _webSocketService.disconnect();
+    _busStopWebSocketService.disconnect();
     super.dispose();
   }
 
@@ -53,23 +63,28 @@ class _MapContainerState extends State<MapContainer> {
     });
 
     // Debug: verificar las paradas
-    SvgTrafficService.debugBusStops();
+    // SvgTrafficService.debugBusStops();
 
     // Iniciar simulación automática (opcional) - deshabilitado para pruebas
     // _startSimulation();
   }
 
   void _setupWebSocket() {
-    // Configurar callbacks del WebSocket
+    // Configurar callbacks del WebSocket de tráfico
     _webSocketService.onTrafficUpdate = _handleTrafficUpdate;
-    _webSocketService.onEtaUpdate = _handleEtaUpdate;
     _webSocketService.onError = _handleWebSocketError;
     _webSocketService.onConnected = _handleWebSocketConnected;
     _webSocketService.onDisconnected = _handleWebSocketDisconnected;
 
+    // Configurar callbacks del WebSocket de paradas
+    _busStopWebSocketService.onEtaUpdate = _handleEtaUpdate;
+    _busStopWebSocketService.onError = _handleBusStopWebSocketError;
+    _busStopWebSocketService.onConnected = _handleBusStopWebSocketConnected;
+    _busStopWebSocketService.onDisconnected =
+        _handleBusStopWebSocketDisconnected;
+
     // Configurar suscripción para actualizaciones de paradas
     _busStopsSubscription = _busStopService.busStopsStream.listen((busStops) {
-      print('🚌 Actualización de paradas recibida');
       setState(() {
         // Forzar actualización de la UI cuando cambien las paradas
       });
@@ -78,78 +93,76 @@ class _MapContainerState extends State<MapContainer> {
     // Iniciar limpieza automática de ETA
     _busStopService.startEtaCleanup();
 
-    // Conectar al WebSocket
+    // Conectar a ambos WebSockets
     _webSocketService.connect();
+    _busStopWebSocketService.connect();
   }
 
   void _handleTrafficUpdate(WebSocketMessage message) {
-    print(
-      '🚦 Actualización de tráfico recibida: ${message.data.signalId} -> ${message.data.signalColor}',
-    );
-
     // Mapear el ID del semáforo del WebSocket al ID del SVG
     final svgId = _mapSignalIdToSvgId(message.data.signalId);
-    print('🔍 ID mapeado: ${message.data.signalId} -> $svgId');
 
     if (svgId == null) {
-      print('⚠️ ID de semáforo no reconocido: ${message.data.signalId}');
       return;
     }
 
     // Mapear el color del WebSocket al estado del semáforo
     final trafficState = _mapColorToTrafficState(message.data.signalColor);
-    print('🎨 Color mapeado: ${message.data.signalColor} -> $trafficState');
 
     if (trafficState == null) {
-      print('⚠️ Color de semáforo no reconocido: ${message.data.signalColor}');
       return;
     }
 
-    print('🔄 Actualizando semáforo $svgId a estado $trafficState');
-
     // Actualizar el semáforo en el servicio SVG
-    print('📝 Cambiando estado del semáforo...');
     SvgTrafficService.changeTrafficLightState(svgId, trafficState);
 
-    print('🖼️ Generando nuevo contenido SVG...');
     final newSvgContent = SvgTrafficService.getSvgWithUpdatedColors();
 
-    print('🔄 Actualizando UI con nuevo SVG...');
     setState(() {
       _svgContent = newSvgContent;
     });
-
-    print('✅ Actualización completa para semáforo $svgId');
   }
 
   void _handleWebSocketError(String error) {
-    print('❌ Error en WebSocket: $error');
     // Aquí podrías mostrar un snackbar o notificación de error
   }
 
   void _handleWebSocketConnected() {
-    print('✅ WebSocket conectado exitosamente');
     setState(() {
       // Actualizar la UI para mostrar el estado conectado
     });
   }
 
   void _handleWebSocketDisconnected() {
-    print('🔌 WebSocket desconectado');
+    setState(() {
+      // Actualizar la UI para mostrar el estado desconectado
+    });
+  }
+
+  void _handleBusStopWebSocketError(String error) {
+    // Manejar errores del WebSocket de paradas
+  }
+
+  void _handleBusStopWebSocketConnected() {
+    setState(() {
+      // Actualizar la UI para mostrar el estado conectado
+    });
+  }
+
+  void _handleBusStopWebSocketDisconnected() {
     setState(() {
       // Actualizar la UI para mostrar el estado desconectado
     });
   }
 
   void _handleEtaUpdate(EtaUpdateMessage message) {
-    print(
-      '🚌 ETA actualizado: ${message.data.stopId} - ${message.data.tipoTransporte} - ${message.data.tiempoFormateado} desde ${message.data.origen}',
-    );
+    // Actualizar el servicio de paradas de bus con cambio de color
+    _busStopService.updateEtaWithColorChange(message);
 
-    // Actualizar el servicio de paradas de bus
-    _busStopService.updateEta(message);
-
-    // No necesitamos setState aquí porque el StreamController ya notifica los cambios
+    // Actualizar el SVG con los nuevos colores de paradas
+    setState(() {
+      _svgContent = SvgTrafficService.getSvgWithUpdatedColors();
+    });
   }
 
   String? _mapSignalIdToSvgId(String signalId) {
@@ -189,6 +202,45 @@ class _MapContainerState extends State<MapContainer> {
         return TrafficLightState.off;
       default:
         return null;
+    }
+  }
+
+  // Métodos para controlar el zoom del mapa
+  void _zoomIn() {
+    const double zoomFactor = 1.2; // Factor de zoom (20% más)
+    final Matrix4 currentMatrix = _transformationController.value;
+
+    // Obtener la escala actual
+    final double currentScale = currentMatrix.getMaxScaleOnAxis();
+
+    // Calcular nueva escala (máximo 5.0)
+    final double newScale = (currentScale * zoomFactor).clamp(0.5, 5.0);
+
+    if (newScale != currentScale) {
+      // Calcular la nueva matriz de transformación
+      final double scaleChange = newScale / currentScale;
+      final Matrix4 newMatrix = currentMatrix.clone()..scale(scaleChange);
+
+      _transformationController.value = newMatrix;
+    }
+  }
+
+  void _zoomOut() {
+    const double zoomFactor = 0.8; // Factor de zoom (20% menos)
+    final Matrix4 currentMatrix = _transformationController.value;
+
+    // Obtener la escala actual
+    final double currentScale = currentMatrix.getMaxScaleOnAxis();
+
+    // Calcular nueva escala (mínimo 0.5)
+    final double newScale = (currentScale * zoomFactor).clamp(0.5, 5.0);
+
+    if (newScale != currentScale) {
+      // Calcular la nueva matriz de transformación
+      final double scaleChange = newScale / currentScale;
+      final Matrix4 newMatrix = currentMatrix.clone()..scale(scaleChange);
+
+      _transformationController.value = newMatrix;
     }
   }
 
@@ -232,56 +284,92 @@ class _MapContainerState extends State<MapContainer> {
       color: Colors.grey[100],
       child: Stack(
         children: [
-          // SVG del mapa
-          SvgPicture.string(
-            _svgContent,
-            fit: BoxFit.cover,
-            allowDrawingOutsideViewBox: true,
+          // SVG del mapa con InteractiveViewer
+          InteractiveViewer(
+            transformationController: _transformationController,
+            minScale: 0.5,
+            maxScale: 5.0,
+            constrained: false,
+            boundaryMargin: const EdgeInsets.all(20),
+            child: Stack(
+              children: [
+                // SVG del mapa
+                SvgPicture.string(
+                  _svgContent,
+                  fit: BoxFit.contain,
+                  allowDrawingOutsideViewBox: true,
+                ),
+
+                // Overlay de paradas de bus con ETA
+                const BusStopsEtaOverlay(),
+              ],
+            ),
           ),
 
-          // Overlay de paradas de bus con ETA
-          const BusStopsEtaOverlay(),
-
-          // Indicador de estado del WebSocket
+          // Botones de control de zoom
           Positioned(
-            top: 16,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _webSocketService.isConnected
-                    ? Colors.green
-                    : Colors.red,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+            top: 20,
+            right: 20,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Botón Zoom In (+)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: FloatingActionButton(
+                    onPressed: _zoomIn,
+                    backgroundColor: Colors.blue[600],
+                    foregroundColor: Colors.white,
+                    mini: true,
+                    tooltip: 'Zoom In',
+                    child: const Icon(Icons.add, size: 20),
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _webSocketService.isConnected ? Icons.wifi : Icons.wifi_off,
-                    color: Colors.white,
-                    size: 16,
+                ),
+
+                // Botón Zoom Out (-)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: FloatingActionButton(
+                    onPressed: _zoomOut,
+                    backgroundColor: Colors.blue[600],
+                    foregroundColor: Colors.white,
+                    mini: true,
+                    tooltip: 'Zoom Out',
+                    child: const Icon(Icons.remove, size: 20),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _webSocketService.isConnected
-                        ? 'Conectado'
-                        : 'Desconectado',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+
+                // Botón Reset Zoom (opcional)
+                FloatingActionButton(
+                  onPressed: () {
+                    _transformationController.value = Matrix4.identity();
+                  },
+                  backgroundColor: Colors.grey[700],
+                  foregroundColor: Colors.white,
+                  mini: true,
+                  tooltip: 'Reset Zoom',
+                  child: const Icon(Icons.center_focus_strong, size: 16),
+                ),
+              ],
+            ),
+          ),
+
+          // Botón flotante para mostrar información de ETA
+          Positioned(
+            bottom: 20,
+            right: 20,
+            child: FloatingActionButton.extended(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const EtaInfoModal(),
+                );
+              },
+              backgroundColor: Colors.blue[600],
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.info_outline),
+              label: const Text('Paradas'),
+              tooltip: 'Ver información de paradas y ETA',
             ),
           ),
         ],

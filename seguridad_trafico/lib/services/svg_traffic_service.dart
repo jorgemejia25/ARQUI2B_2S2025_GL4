@@ -4,7 +4,7 @@ import '../models/bus_stop.dart';
 
 class SvgTrafficService {
   static String? _svgContent;
-  static String? _originalSvgContent; // Mantener una copia del SVG original
+  static String? _originalSvgContent;
   static final Map<String, TrafficLight> _trafficLights = {};
   static final Map<String, BusStop> _busStops = {};
 
@@ -67,7 +67,7 @@ class SvgTrafficService {
     if (_svgContent != null) return _svgContent!;
 
     _svgContent = await rootBundle.loadString('assets/Map.svg');
-    _originalSvgContent = _svgContent; // Guardar copia original
+    _originalSvgContent = _svgContent;
     return _svgContent!;
   }
 
@@ -90,18 +90,12 @@ class SvgTrafficService {
       });
     });
 
-    // Actualizar el color de cada parada de autobús de forma más directa
     _busStops.forEach((id, busStop) {
       final newColor = busStop.hexColor;
       final svgId = busStop.svgId;
       final originalColor = _originalBusStopColors[svgId];
 
       if (originalColor != null) {
-        print(
-          'Processing $svgId: state=${busStop.state}, original=$originalColor, new=$newColor',
-        );
-
-        // Método directo: buscar la primera ocurrencia del color original después del ID de la parada
         final svgIdIndex = updatedSvg.indexOf('id="$svgId"');
         if (svgIdIndex != -1) {
           final afterIdSvg = updatedSvg.substring(svgIdIndex);
@@ -114,13 +108,8 @@ class SvgTrafficService {
               globalColorIndex + 'fill="$originalColor"'.length,
             );
 
-            updatedSvg = before + 'fill="$newColor"' + after;
-            print('✅ Updated $svgId: $originalColor -> $newColor');
-          } else {
-            print('❌ Color $originalColor not found after $svgId');
+            updatedSvg = '${before}fill="$newColor"$after';
           }
-        } else {
-          print('❌ SVG ID $svgId not found');
         }
       }
     });
@@ -128,41 +117,56 @@ class SvgTrafficService {
     return updatedSvg;
   }
 
-  // Cambiar el estado de un semáforo específico
   static void changeTrafficLightState(String id, TrafficLightState newState) {
     if (_trafficLights.containsKey(id)) {
       _trafficLights[id]!.changeState(newState);
     }
   }
 
-  // Cambiar el estado de una parada específica
   static void changeBusStopState(String id, BusStopState newState) {
     if (_busStops.containsKey(id)) {
       _busStops[id]!.changeState(newState);
     }
   }
 
-  // Obtener el estado de un semáforo
+  static void changeBusStopStateByTransport(String id, String tipoTransporte) {
+    if (!_busStops.containsKey(id)) return;
+
+    BusStopState newState;
+
+    if (tipoTransporte.toLowerCase() == 'transmetro') {
+      newState = BusStopState.active; // Verde para Transmetro
+    } else if (tipoTransporte.toLowerCase() == 'transurbano') {
+      newState = BusStopState.busy;
+    } else {
+      newState = BusStopState.waiting;
+    }
+
+    _busStops[id]!.changeState(newState);
+  }
+
+  static void resetBusStopState(String id) {
+    if (_busStops.containsKey(id)) {
+      _busStops[id]!.changeState(BusStopState.inactive);
+    }
+  }
+
   static TrafficLightState? getTrafficLightState(String id) {
     return _trafficLights[id]?.state;
   }
 
-  // Obtener el estado de una parada
   static BusStopState? getBusStopState(String id) {
     return _busStops[id]?.state;
   }
 
-  // Obtener todos los semáforos
   static Map<String, TrafficLight> getAllTrafficLights() {
     return Map.from(_trafficLights);
   }
 
-  // Obtener todas las paradas
   static Map<String, BusStop> getAllBusStops() {
     return Map.from(_busStops);
   }
 
-  // Obtener el estado de todos los semáforos como mapa
   static Map<String, TrafficLightState> getAllTrafficLightStates() {
     final Map<String, TrafficLightState> states = {};
     _trafficLights.forEach((id, trafficLight) {
@@ -171,7 +175,6 @@ class SvgTrafficService {
     return states;
   }
 
-  // Obtener el estado de todas las paradas como mapa
   static Map<String, BusStopState> getAllBusStopStates() {
     final Map<String, BusStopState> states = {};
     _busStops.forEach((id, busStop) {
@@ -180,119 +183,39 @@ class SvgTrafficService {
     return states;
   }
 
-  // Cambiar el estado de todos los semáforos
   static void changeAllTrafficLightsState(TrafficLightState newState) {
     _trafficLights.forEach((id, trafficLight) {
       trafficLight.changeState(newState);
     });
   }
 
-  // Cambiar el estado de todas las paradas
   static void changeAllBusStopsState(BusStopState newState) {
     _busStops.forEach((id, busStop) {
       busStop.changeState(newState);
     });
   }
 
-  // Simular secuencia de semáforos
   static void simulateTrafficSequence() {
     _trafficLights.forEach((id, trafficLight) {
       trafficLight.toggleState();
     });
   }
 
-  // Simular secuencia de paradas
   static void simulateBusStopSequence() {
     _busStops.forEach((id, busStop) {
       busStop.toggleActive();
     });
   }
 
-  // Resetear todos los semáforos
   static void resetAllTrafficLights() {
     _trafficLights.forEach((id, trafficLight) {
       trafficLight.changeState(TrafficLightState.off);
     });
   }
 
-  // Resetear todas las paradas
   static void resetAllBusStops() {
     _busStops.forEach((id, busStop) {
       busStop.reset();
     });
-  }
-
-  // Función de debug para verificar las paradas
-  static void debugBusStops() {
-    print('=== DEBUG BUS STOPS ===');
-    print('Total bus stops: ${_busStops.length}');
-    _busStops.forEach((id, busStop) {
-      print(
-        'BusStop $id: svgId=${busStop.svgId}, state=${busStop.state}, color=${busStop.hexColor}',
-      );
-      final originalColor = _originalBusStopColors[busStop.svgId];
-      print('  Original color: $originalColor');
-    });
-
-    if (_originalSvgContent != null) {
-      print('Original SVG analysis:');
-      _originalBusStopColors.forEach((svgId, color) {
-        final hasColor = _originalSvgContent!.contains('fill="$color"');
-        final hasId = _originalSvgContent!.contains('id="$svgId"');
-        print('  $svgId: id found=$hasId, color $color found=$hasColor');
-
-        if (hasId) {
-          final idIndex = _originalSvgContent!.indexOf('id="$svgId"');
-          final afterId = _originalSvgContent!.substring(
-            idIndex,
-            idIndex + 200,
-          );
-          print('    Context: ${afterId.replaceAll('\n', ' ')}');
-        }
-      });
-    }
-  }
-
-  // Función de prueba directa para P1
-  static String testP1ColorChange() {
-    if (_originalSvgContent == null) return 'No SVG loaded';
-
-    print('=== TEST P1 COLOR CHANGE ===');
-    final originalColor = '#51A248';
-    final newColor = '#FF0000';
-
-    String testSvg = _originalSvgContent!;
-    print('Original SVG contains P1: ${testSvg.contains('id="P1"')}');
-    print(
-      'Original SVG contains green: ${testSvg.contains('fill="$originalColor"')}',
-    );
-
-    // Buscar P1 y cambiar su color
-    final p1Index = testSvg.indexOf('id="P1"');
-    if (p1Index != -1) {
-      final afterP1 = testSvg.substring(p1Index);
-      final colorIndex = afterP1.indexOf('fill="$originalColor"');
-
-      if (colorIndex != -1) {
-        final globalColorIndex = p1Index + colorIndex;
-        final before = testSvg.substring(0, globalColorIndex);
-        final after = testSvg.substring(
-          globalColorIndex + 'fill="$originalColor"'.length,
-        );
-
-        testSvg = before + 'fill="$newColor"' + after;
-        print('✅ Test successful: Changed P1 color');
-        print(
-          'Updated SVG contains red: ${testSvg.contains('fill="$newColor"')}',
-        );
-        return testSvg;
-      } else {
-        print('❌ Color not found after P1');
-      }
-    } else {
-      print('❌ P1 not found');
-    }
-
-    return _originalSvgContent!;
   }
 }

@@ -1,3 +1,5 @@
 fastapi
 uvicorn
+paho-mqtt
+uvicorn[standard]==0.35.0
 

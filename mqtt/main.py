@@ -11,6 +11,7 @@ import sys
 import argparse
 import json
 import paho.mqtt.client as mqtt
+from paho.mqtt.client import CallbackAPIVersion
 
 # Imports directos para ejecutar desde el directorio mqtt
 from serial_receiver import ArduinoSerialReceiver, SerialConfig
@@ -41,7 +42,7 @@ class ArduinoMainController:
         self.simulation_mode = simulation_mode
         
         # Cliente MQTT
-        self.mqtt_client = mqtt.Client(MQTT_CLIENT_ID)
+        self.mqtt_client = mqtt.Client(CallbackAPIVersion.VERSION1, client_id=MQTT_CLIENT_ID)
         self.mqtt_connected = False
         
         # Configurar manejo de señales para cierre limpio

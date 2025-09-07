@@ -226,7 +226,7 @@ class ArduinoSimulator:
             "sismo": {
                 "activo": 1 if self.earthquake_state['active'] else 0,
                 "magnitud": self.earthquake_state['magnitude'],
-                "origen": "simulacion" if self.earthquake_state['active'] else ""
+                "origen": "Centro Histórico" if self.earthquake_state['active'] else ""
             },
             "panic_buttons": {},
             "infracciones": list(self.active_violations),

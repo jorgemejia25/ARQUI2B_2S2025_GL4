@@ -4,6 +4,7 @@ Cliente MQTT que publica datos simulados del Arduino.
 """
 
 import paho.mqtt.client as mqtt
+from paho.mqtt.client import CallbackAPIVersion
 import time
 import json
 import random
@@ -19,7 +20,7 @@ class ArduinoMQTTPublisher:
     """Publicador MQTT para datos simulados del Arduino."""
     
     def __init__(self):
-        self.client = mqtt.Client(MQTT_CLIENT_ID)
+        self.client = mqtt.Client(CallbackAPIVersion.VERSION1, client_id=MQTT_CLIENT_ID)
         self.running = False
         
         # Configurar callbacks
@@ -63,13 +64,13 @@ class ArduinoMQTTPublisher:
         # Simular datos de semáforos
         semaforos = []
         for i in range(random.randint(3, 8)):
-            estado = random.choice(["verde", "amarillo", "rojo"])
+            estado = random.choice(["VERDE", "AMARILLO", "ROJO"])
             semaforos.append({
-                "id": f"sem_{i+1}",
+                "id": f"SEMAFORO_{i+1:03d}",   # o "S1"..."S10"
                 "estado": estado,
                 "ubicacion": f"Intersección {i+1}"
             })
-        
+
         # Simular datos de distancias
         distancias = []
         for i in range(random.randint(2, 5)):
@@ -100,22 +101,29 @@ class ArduinoMQTTPublisher:
         
         # Simular datos de botones de pánico
         botones_panico = []
-        if random.random() < 0.05:  # 5% de probabilidad
+        if random.random() < 0.3:
+            btn_id = random.choice(["P1","P2","P3","P4"])
             botones_panico.append({
-                "id": f"btn_{random.randint(1, 5)}",
+                "id": btn_id,
+                "activo": True,                 # MUY IMPORTANTE
+                "button_id": random.randint(1, 5),
                 "ubicacion": f"Ubicación {random.randint(1, 10)}"
             })
+
         
         # Simular datos de infracciones
         infracciones = []
         if random.random() < 0.15:  # 15% de probabilidad
             tipos = ["Exceso de velocidad", "Semáforo en rojo", "Estacionamiento prohibido"]
             for _ in range(random.randint(1, 3)):
-                infracciones.append({
-                    "tipo": random.choice(tipos),
-                    "timestamp": timestamp,
-                    "ubicacion": f"Ubicación {random.randint(1, 20)}"
-                })
+                if random.random() < 0.4:
+                    for _ in range(random.randint(1, 2)):
+                        sem_id = f"SEMAFORO_{random.randint(1, 5):03d}"
+                        infracciones.append({
+                            "signal_id": sem_id,
+                            "signal_color": random.choice(["red","yellow","green"]),
+                            "violation_type": "red_light"   # clave para que sea INFRACCION
+                        })
         
         # Simular datos de ETA
         eta = []

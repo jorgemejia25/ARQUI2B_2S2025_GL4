@@ -9,7 +9,7 @@
   {
     "ts":"...", "semaforos":{S1..S10}, "dist_cm":{P1..P6}, "gas_ppm":{Z1,Z2},
     "zumbador":{Z1,Z2}, "sismo":{activo,...}, "panic_buttons":{PB1..PB4},
-    "infracciones":[ "S#", ... ], "_protocol_version":"1.0"
+    "infracciones":[ "S#", ... ], "_protocol_version":"1.1"
   }
 */
 
@@ -285,7 +285,7 @@ void updateTrafficLights()
 // ===== Mapeo de grupos por semáforo (UI S1..S10) =====
 #define SEM_A 0
 #define SEM_B 1
-// S3, S6 y S7 son grupo B; el resto A
+// S3, S7 y S9 son grupo B; el resto A
 const uint8_t S_GROUP[10] = {
     SEM_A, // S1
     SEM_A, // S2

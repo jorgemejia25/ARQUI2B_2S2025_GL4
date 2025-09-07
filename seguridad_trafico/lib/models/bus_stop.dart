@@ -32,11 +32,11 @@ class BusStop {
   String get hexColor {
     switch (state) {
       case BusStopState.active:
-        return '#00FF00'; // Verde brillante para activa
+        return '#00FF00'; // Verde brillante para Transmetro
       case BusStopState.inactive:
         return '#808080'; // Gris para inactiva
       case BusStopState.busy:
-        return '#FF0000'; // Rojo para ocupada
+        return '#0080FF'; // Azul para Transurbano
       case BusStopState.waiting:
         return '#FFFF00'; // Amarillo brillante para esperando
     }

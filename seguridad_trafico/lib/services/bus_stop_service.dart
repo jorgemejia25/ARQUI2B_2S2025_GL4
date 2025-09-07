@@ -1,6 +1,7 @@
 import 'dart:async';
 import '../models/websocket_message.dart';
 import '../models/bus_stop.dart';
+import 'svg_traffic_service.dart';
 
 class BusStopService {
   static BusStopService? _instance;
@@ -42,8 +43,6 @@ class BusStopService {
     for (final stop in busStops) {
       _busStopsEta[stop.id] = BusStopEtaInfo(busStop: stop, etaUpdates: []);
     }
-
-    print('🚌 Inicializadas ${busStops.length} paradas de bus');
   }
 
   // Actualizar ETA para una parada específica
@@ -51,7 +50,6 @@ class BusStopService {
     final stopId = etaMessage.data.stopId;
 
     if (!_busStopsEta.containsKey(stopId)) {
-      print('⚠️ Parada no encontrada: $stopId');
       return;
     }
 
@@ -72,12 +70,50 @@ class BusStopService {
       _busStopsEta[stopId]!.etaUpdates.removeAt(0);
     }
 
-    print(
-      '🚌 ETA actualizado para $stopId: ${etaMessage.data.tipoTransporte} - ${etaMessage.data.tiempoFormateado}',
-    );
-
     // Notificar cambios
     _busStopsController.add(Map.from(_busStopsEta));
+  }
+
+  // Actualizar ETA y cambiar color de parada en el SVG
+  void updateEtaWithColorChange(EtaUpdateMessage etaMessage) {
+    final stopId = etaMessage.data.stopId;
+    final tipoTransporte = etaMessage.data.tipoTransporte;
+
+    // Actualizar ETA
+    updateEta(etaMessage);
+
+    // Cambiar color de la parada en el SVG según el tipo de transporte
+    _changeBusStopColorByTransport(stopId, tipoTransporte);
+  }
+
+  // Cambiar color de parada según tipo de transporte
+  void _changeBusStopColorByTransport(String stopId, String tipoTransporte) {
+    // Mapear stopId a los IDs usados en el SVG
+    String svgId = stopId;
+    if (stopId == 'P2_2') {
+      svgId = 'P2'; // El SVG usa P2_2 pero nuestro servicio usa P2
+    }
+
+    // Cambiar estado en el servicio SVG
+    SvgTrafficService.changeBusStopStateByTransport(svgId, tipoTransporte);
+
+    // Cambiar estado en nuestro servicio local
+    if (tipoTransporte.toLowerCase() == 'transmetro') {
+      _busStopsEta[stopId]!.busStop.changeState(BusStopState.active); // Verde
+    } else if (tipoTransporte.toLowerCase() == 'transurbano') {
+      _busStopsEta[stopId]!.busStop.changeState(BusStopState.busy); // Azul
+    } else {
+      _busStopsEta[stopId]!.busStop.changeState(
+        BusStopState.waiting,
+      ); // Amarillo
+    }
+  }
+
+  // Resetear color de parada a inactivo
+  void resetBusStopColor(String stopId) {
+    if (_busStopsEta.containsKey(stopId)) {
+      _busStopsEta[stopId]!.busStop.changeState(BusStopState.inactive);
+    }
   }
 
   // Obtener información de ETA para una parada específica
@@ -105,9 +141,6 @@ class BusStopService {
 
       if (entry.value.etaUpdates.length != originalLength) {
         hasChanges = true;
-        print(
-          '🧹 Limpiados ${originalLength - entry.value.etaUpdates.length} ETA expirados para ${entry.key}',
-        );
       }
     }
 
@@ -123,14 +156,12 @@ class BusStopService {
     _cleanupTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       cleanExpiredEta();
     });
-    print('🧹 Limpieza automática de ETA iniciada');
   }
 
   // Detener limpieza automática
   void stopEtaCleanup() {
     _cleanupTimer?.cancel();
     _cleanupTimer = null;
-    print('🧹 Limpieza automática de ETA detenida');
   }
 
   // Limpiar recursos

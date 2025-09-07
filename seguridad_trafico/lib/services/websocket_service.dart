@@ -4,6 +4,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/websocket_message.dart';
 import '../models/traffic_light.dart';
 
+
 class WebSocketService {
   static WebSocketService? _instance;
   static WebSocketService get instance => _instance ??= WebSocketService._();
@@ -13,7 +14,7 @@ class WebSocketService {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
   bool _isConnected = false;
-  String _url = 'ws://192.168.1.181:8001/ws/traffic';
+  String _url = 'ws://10.0.2.2:8001/ws/traffic';
 
   // Callbacks para manejar los mensajes
   Function(WebSocketMessage)? onTrafficUpdate;
@@ -304,4 +305,8 @@ class WebSocketService {
     final jsonString = json.encode(requestMessage);
     sendMessage(jsonString);
   }
+
+
 }
+
+

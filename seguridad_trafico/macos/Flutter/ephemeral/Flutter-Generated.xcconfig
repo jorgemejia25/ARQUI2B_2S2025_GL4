@@ -1,6 +1,6 @@
 // This is a generated file; do not edit or check into version control.
-FLUTTER_ROOT=/opt/homebrew/share/flutter
-FLUTTER_APPLICATION_PATH=/Users/jorgemejia/Documents/USAC/arqui2/seguridad_trafico
+FLUTTER_ROOT=/opt/flutter
+FLUTTER_APPLICATION_PATH=/home/aarandi/Desktop/Lab Arqui 2/Proyecto/ARQUI2B_2S2025_GL4/seguridad_trafico
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_BUILD_DIR=build
 FLUTTER_BUILD_NAME=1.0.0

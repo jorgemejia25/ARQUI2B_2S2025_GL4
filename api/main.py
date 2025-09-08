@@ -7,7 +7,8 @@ import logging
 import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-
+from data_endpoints import router as data_router
+from insert_data_endpoints import router as insert_router
 from config import *
 from mqtt_handler import MQTTHandler
 from websocket_manager import WebSocketManager
@@ -44,6 +45,10 @@ mqtt_handler = MQTTHandler(MQTT_BROKER, MQTT_PORT, MQTT_TOPICS, websocket_manage
 
 # Incluir rutas
 app.include_router(router, prefix="/api/v1")
+app.include_router(data_router, prefix="/api/v1/data")
+app.include_router(insert_router, prefix="/api/v1/insert")
+
+
 
 # Endpoints WebSocket
 @app.websocket("/ws/stops")

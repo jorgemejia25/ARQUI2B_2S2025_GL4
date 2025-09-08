@@ -126,7 +126,7 @@ class WebSocketManager:
         }
         logger.info("=== EMITIENDO ALERTA GENERAL ===")
         logger.info(f"Datos: {json.dumps(alert_data, ensure_ascii=False)}")
-        await self.broadcast_to_type(message, "alerts")
+        await self.broadcast_to_all(message)
         logger.info(f"Alerta emitida: {alert_data.get('alert_type')}")
         logger.info("=== FINALIZADA EMISIÓN DE ALERTA ===")
     

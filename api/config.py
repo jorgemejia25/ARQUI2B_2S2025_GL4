@@ -5,7 +5,7 @@ Configuración del API IoT - Puente MQTT
 SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 8001
 
-MQTT_BROKER = "192.168.1.16"
+MQTT_BROKER = "192.168.1.181"
 MQTT_PORT = 1883
 MQTT_TOPICS = [
     "arduino/data",

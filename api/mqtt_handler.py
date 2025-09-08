@@ -240,16 +240,12 @@ class MQTTHandler:
                     # Alerta sísmica (si supera umbral)
                     threshold = payload.get("threshold_g", 2.0)
                     if payload["seismic_intensity"] > threshold:
+                        logger.info(f"Sismo supera umbral ({threshold} g), emitiendo alerta...")
                         alert_data = {
                             "timestamp": time.time(),
                             "alert_type": "SEISMIC_ALERT",
-                            "severity": 4,
-                            "data": {
-                                "seismic_intensity": payload["seismic_intensity"],
-                                "threshold_g": threshold,
-                                "tiene_sismo": True,
-                                "origen": "Centro Histórico",   
-                            }
+                            "severity": 3,
+                            "data": payload
                         }
                         await self.websocket_manager.emit_alert(alert_data)
                         logger.info("Alerta sísmica emitida exitosamente")
@@ -379,17 +375,8 @@ class MQTTHandler:
                                     }
                                 }
                                 await self.websocket_manager.emit_stop_update(stop_data)
-                                # también como ALERTA para /ws/alerts
-                                alert_data = {
-                                    "timestamp": time.time(),
-                                    "alert_type": "PANICO",
-                                    "severity": 5,
-                                    "stop_id": boton["id"],
-                                    "origen": boton.get("ubicacion", f"Parada {boton['id']}"),
-                                }
-                                await self.websocket_manager.emit_alert(alert_data)
-                                logger.info(f"Actualización de parada y alerta emitidas para botón {boton['id']}")
-
+                                logger.info(f"Actualización de parada emitida para botón {boton['id']}")
+                    
                     # Procesar mediciones de gas
                     if "gas" in payload:
                         logger.info(f"Procesando {len(payload['gas'])} mediciones de gas...")
@@ -400,7 +387,6 @@ class MQTTHandler:
                             
                             if is_alto or ppm > 100:  # Umbral de 100 ppm
                                 logger.info(f"Gas alto detectado en {zona}: {ppm} ppm - emitiendo alerta")
-                                # Dentro de "Procesar mediciones de gas":
                                 alert_data = {
                                     "timestamp": time.time(),
                                     "alert_type": "GAS_ALERT",
@@ -409,7 +395,6 @@ class MQTTHandler:
                                         "gas_ppm": ppm,
                                         "threshold_ppm": 100.0,
                                         "zona": zona,
-                                        "origen": zona,         
                                         "is_alto": is_alto
                                     }
                                 }
@@ -419,16 +404,14 @@ class MQTTHandler:
                     # Procesar detección de sismo
                     if "tiene_sismo" in payload and payload["tiene_sismo"]:
                         logger.info("Sismo detectado - emitiendo alerta sísmica")
-                        sismo = payload.get("sismo", {}) or {}
                         alert_data = {
                             "timestamp": time.time(),
                             "alert_type": "SEISMIC_ALERT",
-                            "severity": 4,
+                            "severity": 3,
                             "data": {
-                                "seismic_intensity": sismo.get("magnitud", 3.0),
+                                "seismic_intensity": payload.get("sismo", {}).get("intensity", 3.0),
                                 "threshold_g": 2.0,
-                                "tiene_sismo": True,
-                                "origen": "Centro Histórico"        
+                                "tiene_sismo": True
                             }
                         }
                         await self.websocket_manager.emit_alert(alert_data)
@@ -438,51 +421,21 @@ class MQTTHandler:
                     if "infracciones" in payload and len(payload["infracciones"]) > 0:
                         logger.info(f"Procesando {len(payload['infracciones'])} infracciones...")
                         for infraccion in payload["infracciones"]:
-                            # Aceptar ambos formatos: dict o string ("S9", "SEMAFORO_003", etc.)
-                            if isinstance(infraccion, dict):
-                                signal_id = (infraccion.get("signal_id")
-                                            or infraccion.get("id")
-                                            or infraccion.get("semaforo_id")
-                                            or "unknown")
-                                signal_color = infraccion.get("signal_color", "red")
-                                violation_type = infraccion.get("violation_type", "red_light")
-                            else:
-                                # Es un string (ej. "S9"): asumimos luz roja
-                                signal_id = str(infraccion)
-                                signal_color = "red"
-                                violation_type = "red_light"
-
-                            logger.info(f"Infracción detectada en {signal_id} (color={signal_color})")
-
+                            logger.info(f"Infracción detectada: {infraccion}")
                             traffic_data = {
                                 "timestamp": time.time(),
-                                "signal_id": signal_id,
-                                "signal_color": signal_color,
-                                "violation_type": violation_type,
+                                "signal_id": infraccion.get("signal_id", "unknown"),
+                                "signal_color": infraccion.get("signal_color", "red"),
+                                "violation_type": infraccion.get("violation_type", "red_light"),
                                 "data": {
                                     "alert_type": "INFRACCION",
-                                    "signal_id": signal_id,
-                                    "signal_color": signal_color,
-                                    "severity": 5
+                                    "signal_id": infraccion.get("signal_id", "unknown"),
+                                    "signal_color": infraccion.get("signal_color", "red"),
+                                    "severity": 3
                                 }
                             }
-
-                            # WS: /ws/traffic (para vista de tráfico)
                             await self.websocket_manager.emit_traffic_update(traffic_data)
-
-                            # WS: /ws/alerts (para feed unificado de alertas)
-                            alert_data = {
-                                "timestamp": time.time(),
-                                "alert_type": "INFRACCION",
-                                "severity": 5,
-                                "signal_id": signal_id,
-                                "signal_color": signal_color,
-                            }
-                            await self.websocket_manager.emit_alert(alert_data)
-
-                        logger.info("Procesadas todas las infracciones.")
-
-
+                            logger.info(f"Actualización de tráfico emitida para infracción en {infraccion.get('signal_id')}")
                     
                     logger.info("Procesamiento completo de datos del Arduino finalizado")
                     

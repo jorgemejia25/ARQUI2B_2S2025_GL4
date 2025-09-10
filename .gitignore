@@ -21,6 +21,22 @@ wheels/
 *.egg
 MANIFEST
 
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
 # Virtual environments
 venv/
 env/
@@ -28,71 +44,80 @@ ENV/
 .venv/
 .env/
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-
-# Logs
-*.log
-logs/
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
 
-# Arduino
-*.hex
-*.bin
-*.elf
-*.eep
-*.o
-*.d
-*.map
+# Logs
+*.log
 
-# Flutter
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-pubspec.lock
-build/
-android/app/build/
-ios/Flutter/App.framework/
-ios/Flutter/Flutter.framework/
-ios/build/
+# Environment variables
+.env
+.env.local
+.env.production
 
-# Node.js (if any)
+# Docker
+.dockerignore
+
+# Node modules (if any)
 node_modules/
-npm-debug.log*
+
+# Build artifacts
+*.tar.gz
+*.zip
+
+# Arduino build files
+*.hex
+*.elf
+
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+*.dart.js
+*.info.json
+
+# Android
+android/app/build/
+android/build/
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/**/GeneratedPluginRegistrant.java
+
+# iOS
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Web
+web/
+
+# Coverage
+coverage/
 
 # Temporary files
 *.tmp
 *.temp
-*.bak
-
-# Secrets and configs
-secrets/
-config.local.py
-.env.local
-*.key
-*.pem
-
-# Documentation generated
-*.pdf
-*.docx
-
-# MQTT logs
-mqtt_logs/

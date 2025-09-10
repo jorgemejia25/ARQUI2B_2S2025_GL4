@@ -20,8 +20,9 @@ from config import SERIAL_CONFIG
 from simulation_mode import ArduinoSimulator
 
 # Configuración MQTT
-MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
+import os
+MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = "arduino/data"
 MQTT_CLIENT_ID = "arduino_main_controller"
 

@@ -10,8 +10,13 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class DatabaseManager:
-    def __init__(self, db_path: str = "../ARQUI_2.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        import os
+        if db_path is None:
+            # En producción, usar un path relativo al contenedor
+            self.db_path = os.getenv("DATABASE_PATH", "/app/data/ARQUI_2.db")
+        else:
+            self.db_path = db_path
         self.connection = None
         
     def connect(self) -> bool:

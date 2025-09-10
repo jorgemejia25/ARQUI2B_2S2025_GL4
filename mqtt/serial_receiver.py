@@ -5,10 +5,11 @@ en formato JSON que pueden ser procesados posteriormente.
 """
 
 import serial
+import serial.tools.list_ports
 import time
 import json
 import logging
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 from dataclasses import dataclass
 from threading import Thread, Event
 from arduino_data_parser import ArduinoDataParser, parse_arduino_json
@@ -63,6 +64,27 @@ class ArduinoSerialReceiver:
             
         return logger
     
+    @staticmethod
+    def find_arduino_ports() -> List[str]:
+        """
+        Encuentra puertos que probablemente sean Arduino.
+        
+        Returns:
+            Lista de puertos candidatos
+        """
+        arduino_ports = []
+        ports = serial.tools.list_ports.comports()
+        
+        for port in ports:
+            # Buscar puertos que contengan 'Arduino' en la descripción
+            if 'Arduino' in port.description or 'arduino' in port.description.lower():
+                arduino_ports.append(port.device)
+            # También buscar puertos USB comunes
+            elif 'USB' in port.description or 'ACM' in port.device or 'USB' in port.device:
+                arduino_ports.append(port.device)
+        
+        return arduino_ports
+    
     def connect(self) -> bool:
         """
         Establece la conexión serial con Arduino.
@@ -70,32 +92,46 @@ class ArduinoSerialReceiver:
         Returns:
             True si la conexión fue exitosa, False en caso contrario
         """
-        try:
-            self.serial_connection = serial.Serial(
-                port=self.config.port,
-                baudrate=self.config.baudrate,
-                timeout=self.config.timeout,
-                bytesize=self.config.bytesize,
-                parity=self.config.parity,
-                stopbits=self.config.stopbits
-            )
-            
-            # Esperar a que Arduino se reinicie
-            time.sleep(2)
-            
-            if self.serial_connection.is_open:
-                self.logger.info(f"Conexión serial establecida en {self.config.port}")
-                return True
-            else:
-                self.logger.error("No se pudo abrir la conexión serial")
-                return False
+        # Si el puerto configurado no funciona, intentar encontrar Arduino automáticamente
+        ports_to_try = [self.config.port]
+        
+        # Si el puerto configurado no es el predeterminado, agregar puertos Arduino detectados
+        if self.config.port != '/dev/ttyUSB0':
+            arduino_ports = self.find_arduino_ports()
+            ports_to_try.extend(arduino_ports)
+        
+        for port in ports_to_try:
+            try:
+                self.logger.info(f"Intentando conectar en puerto: {port}")
+                self.serial_connection = serial.Serial(
+                    port=port,
+                    baudrate=self.config.baudrate,
+                    timeout=self.config.timeout,
+                    bytesize=self.config.bytesize,
+                    parity=self.config.parity,
+                    stopbits=self.config.stopbits
+                )
                 
-        except serial.SerialException as e:
-            self.logger.error(f"Error al conectar con Arduino: {e}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Error inesperado al conectar: {e}")
-            return False
+                # Esperar a que Arduino se reinicie
+                time.sleep(2)
+                
+                if self.serial_connection.is_open:
+                    self.logger.info(f"Conexión serial establecida en {port}")
+                    # Actualizar la configuración con el puerto que funcionó
+                    self.config.port = port
+                    return True
+                else:
+                    self.logger.warning(f"No se pudo abrir la conexión en {port}")
+                    
+            except serial.SerialException as e:
+                self.logger.warning(f"Error al conectar en {port}: {e}")
+                continue
+            except Exception as e:
+                self.logger.warning(f"Error inesperado al conectar en {port}: {e}")
+                continue
+        
+        self.logger.error("No se pudo establecer conexión con ningún puerto")
+        return False
     
     def disconnect(self):
         """Cierra la conexión serial."""
@@ -135,11 +171,25 @@ class ArduinoSerialReceiver:
         while self.is_running and not self.stop_event.is_set():
             try:
                 if self.serial_connection and self.serial_connection.in_waiting:
-                    # Leer línea de datos
-                    data_line = self.serial_connection.readline().decode('utf-8').strip()
+                    # Leer datos como bytes primero
+                    raw_data = self.serial_connection.readline()
                     
-                    if data_line:
-                        self._process_data(data_line)
+                    if raw_data:
+                        try:
+                            # Intentar decodificar como UTF-8
+                            data_line = raw_data.decode('utf-8').strip()
+                        except UnicodeDecodeError:
+                            # Si falla UTF-8, intentar con latin-1 o ignorar errores
+                            try:
+                                data_line = raw_data.decode('latin-1').strip()
+                                self.logger.warning(f"Datos decodificados con latin-1: {data_line}")
+                            except UnicodeDecodeError:
+                                # Como último recurso, ignorar caracteres problemáticos
+                                data_line = raw_data.decode('utf-8', errors='ignore').strip()
+                                self.logger.warning(f"Datos decodificados ignorando errores: {data_line}")
+                        
+                        if data_line:
+                            self._process_data(data_line)
                         
             except serial.SerialException as e:
                 self.logger.error(f"Error en la comunicación serial: {e}")

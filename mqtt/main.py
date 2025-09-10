@@ -21,9 +21,16 @@ from simulation_mode import ArduinoSimulator
 
 # Configuración MQTT
 import os
-MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-MQTT_TOPIC = "arduino/data"
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
+
+MQTT_BROKER = os.getenv("MQTT_BROKER", "trolley.proxy.rlwy.net")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "55424"))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "jorge")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "34eikykmbd8w5igpjiebialeisx0yu02")
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "arduino/data")
 MQTT_CLIENT_ID = "arduino_main_controller"
 
 
@@ -64,6 +71,11 @@ class ArduinoMainController:
             # Configurar callbacks MQTT
             self.mqtt_client.on_connect = self._on_mqtt_connect
             self.mqtt_client.on_disconnect = self._on_mqtt_disconnect
+            
+            # Configurar autenticación si se proporcionan credenciales
+            if MQTT_USERNAME and MQTT_PASSWORD:
+                print(f"Configurando autenticación MQTT para usuario: {MQTT_USERNAME}")
+                self.mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
             
             # Conectar al broker
             print(f"Conectando a broker MQTT: {MQTT_BROKER}:{MQTT_PORT}")

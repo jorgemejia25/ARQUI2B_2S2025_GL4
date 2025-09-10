@@ -2,12 +2,18 @@
 Configuración del API IoT - Puente MQTT
 """
 import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("SERVER_PORT", "8001"))
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "jorge")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "34eikykmbd8w5igpjiebialeisx0yu02")
 MQTT_TOPICS = [
     "arduino/data",
 ]

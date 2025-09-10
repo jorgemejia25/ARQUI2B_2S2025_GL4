@@ -5,6 +5,7 @@ import asyncio
 from typing import List, Dict, Any
 import paho.mqtt.client as mqtt
 from database import DatabaseManager
+from config import MQTT_USERNAME, MQTT_PASSWORD
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,11 @@ class MQTTHandler:
     def connect(self):
         """Conectar al broker MQTT"""
         try:
+            # Configurar autenticación si se proporcionan credenciales
+            if MQTT_USERNAME and MQTT_PASSWORD:
+                logger.info(f"Configurando autenticación MQTT para usuario: {MQTT_USERNAME}")
+                self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+            
             self.client.connect(self.broker, self.port, 60)
             self.client.loop_start()
             logger.info(f"Conectado a MQTT broker {self.broker}:{self.port}")

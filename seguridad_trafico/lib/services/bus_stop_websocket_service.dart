@@ -13,7 +13,7 @@ class BusStopWebSocketService {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
   bool _isConnected = false;
-  final String _url = 'ws://192.168.1.181:8001/ws/stops';
+  final String _url = 'ws://192.168.1.172:8001/ws/stops';
 
   // Callbacks para manejar los mensajes
   Function(EtaUpdateMessage)? onEtaUpdate;

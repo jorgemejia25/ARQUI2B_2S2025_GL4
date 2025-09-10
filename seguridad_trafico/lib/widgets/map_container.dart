@@ -317,6 +317,7 @@ class _MapContainerState extends State<MapContainer> {
                 Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: FloatingActionButton(
+                    heroTag: 'fabZoomIn',
                     onPressed: _zoomIn,
                     backgroundColor: Colors.blue[600],
                     foregroundColor: Colors.white,
@@ -330,6 +331,7 @@ class _MapContainerState extends State<MapContainer> {
                 Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: FloatingActionButton(
+                    heroTag: 'fabZoomOut',
                     onPressed: _zoomOut,
                     backgroundColor: Colors.blue[600],
                     foregroundColor: Colors.white,
@@ -341,6 +343,7 @@ class _MapContainerState extends State<MapContainer> {
 
                 // Botón Reset Zoom (opcional)
                 FloatingActionButton(
+                  heroTag: 'fabResetZoom',
                   onPressed: () {
                     _transformationController.value = Matrix4.identity();
                   },
@@ -359,6 +362,7 @@ class _MapContainerState extends State<MapContainer> {
             bottom: 20,
             right: 20,
             child: FloatingActionButton.extended(
+              heroTag: 'fabEtaInfo',
               onPressed: () {
                 showDialog(
                   context: context,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../layouts/main_layout.dart';
 
 class QRScannerScreen extends StatefulWidget {
@@ -10,15 +11,66 @@ class QRScannerScreen extends StatefulWidget {
 }
 
 class _QRScannerScreenState extends State<QRScannerScreen> {
-  final controller = MobileScannerController(
-    facing: CameraFacing.back,
-    torchEnabled: false,
-  );
+  MobileScannerController? controller;
   String? lastValue;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeController();
+  }
+
+  Future<void> _initializeController() async {
+    try {
+      // Verificar permisos de cámara
+      final status = await Permission.camera.status;
+      if (status.isDenied) {
+        final result = await Permission.camera.request();
+        if (result.isDenied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Se requieren permisos de cámara para escanear QR',
+                ),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (status.isPermanentlyDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Los permisos de cámara están permanentemente denegados',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      controller = MobileScannerController(
+        facing: CameraFacing.back,
+        torchEnabled: false,
+      );
+      setState(() => _isInitialized = true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al inicializar la cámara: $e')),
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
-    controller.dispose();
+    controller?.dispose();
     super.dispose();
   }
 
@@ -32,8 +84,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   Uri? _toUri(String? v) {
     if (v == null) return null;
-    final withScheme =
-        v.startsWith('http://') || v.startsWith('https://') ? v : 'https://$v';
+    final withScheme = v.startsWith('http://') || v.startsWith('https://')
+        ? v
+        : 'https://$v';
     final u = Uri.tryParse(withScheme);
     if (u == null) return null;
     if (u.scheme == 'http' || u.scheme == 'https') return u;
@@ -58,16 +111,58 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: MobileScanner(
-                    controller: controller,
-                    onDetect: (capture) {
-                      final barcode = capture.barcodes.first;
-                      final value = barcode.rawValue;
-                      if (value != null && value != lastValue) {
-                        setState(() => lastValue = value);
-                      }
-                    },
-                  ),
+                  child: _isInitialized && controller != null
+                      ? MobileScanner(
+                          controller: controller!,
+                          onDetect: (capture) {
+                            final barcode = capture.barcodes.first;
+                            final value = barcode.rawValue;
+                            if (value != null && value != lastValue) {
+                              setState(() => lastValue = value);
+                            }
+                          },
+                        )
+                      : _isInitialized == false
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.camera_alt_outlined,
+                                size: 64,
+                                color: Color(0xFF1E3A8A),
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Inicializando cámara...',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xFF1E3A8A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 64,
+                                color: Colors.red,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Error al acceder a la cámara',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                 ),
                 // Marco central
                 Center(
@@ -88,12 +183,12 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                     children: [
                       _roundBtn(
                         icon: Icons.flashlight_on,
-                        onTap: () => controller.toggleTorch(),
+                        onTap: () => controller?.toggleTorch(),
                       ),
                       const SizedBox(width: 8),
                       _roundBtn(
                         icon: Icons.cameraswitch,
-                        onTap: () => controller.switchCamera(),
+                        onTap: () => controller?.switchCamera(),
                       ),
                     ],
                   ),
@@ -125,7 +220,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           if (canOpen) ...[
             const SizedBox(height: 12),
             Text(
-              url!.host, // dominio del link
+              url.host, // dominio del link
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -150,7 +245,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: canOpen ? () => _launchURL(url!) : null,
+                onPressed: canOpen ? () => _launchURL(url) : null,
                 child: const Text(
                   'Ir al Link',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),

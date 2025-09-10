@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../layouts/main_layout.dart';        // conserva tu layout
-import '../widgets/alerts_feed.dart';
+import '../layouts/main_layout.dart';
+import '../widgets/alert_feed.dart';
 import '../services/websocket_alerts.dart';
 
 class NotificationsScreen extends StatefulWidget {

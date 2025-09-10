@@ -5,7 +5,7 @@ Aquí puedes modificar los parámetros de conexión según tu configuración.
 
 # Configuración de comunicación serial
 SERIAL_CONFIG = {
-    'port': '/dev/ttyUSB0',  # Linux
+    'port': '/dev/ttyACM0',  # Linux
 
     
     # Velocidad de transmisión (debe coincidir con Arduino)

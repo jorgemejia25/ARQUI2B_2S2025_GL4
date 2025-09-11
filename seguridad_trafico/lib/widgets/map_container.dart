@@ -77,7 +77,14 @@ class _MapContainerState extends State<MapContainer> {
     _webSocketService.onDisconnected = _handleWebSocketDisconnected;
 
     // Configurar callbacks del WebSocket de paradas
-    _busStopWebSocketService.onEtaUpdate = _handleEtaUpdate;
+    _busStopWebSocketService.onEtaUpdate = (msg) {
+      // Log para depurar recepción de ETA
+      // ignore: avoid_print
+      print(
+        'ETA recibido: stop=${msg.data.stopId}, tipo=${msg.data.tipoTransporte}, t=${msg.data.tiempoSegundos}s, origen=${msg.data.origen}',
+      );
+      _handleEtaUpdate(msg);
+    };
     _busStopWebSocketService.onError = _handleBusStopWebSocketError;
     _busStopWebSocketService.onConnected = _handleBusStopWebSocketConnected;
     _busStopWebSocketService.onDisconnected =

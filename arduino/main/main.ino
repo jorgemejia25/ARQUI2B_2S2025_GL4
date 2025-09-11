@@ -518,13 +518,23 @@ void emitStatusJson()
   }
   Serial.print("},");
 
-  // Leer valores analógicos reales para gas/humo
+  // Leer valores analógicos para detectar humo real
   int analog1 = analogRead(PIN_AO);
   int analog2 = analogRead(PIN_A1);
 
-  // Solo mapear a valores altos si realmente detecta humo (>= HUMO_UMBRAL)
-  int gas1 = (analog1 >= HUMO_UMBRAL) ? map(analog1, HUMO_UMBRAL, 1023, 280, 350) : map(constrain(analog1, 0, HUMO_UMBRAL - 1), 0, HUMO_UMBRAL - 1, 180, 240);
-  int gas2 = (analog2 >= HUMO_UMBRAL) ? map(analog2, HUMO_UMBRAL, 1023, 280, 350) : map(constrain(analog2, 0, HUMO_UMBRAL - 1), 0, HUMO_UMBRAL - 1, 180, 240);
+  // Valores base normales (sin humo)
+  int gas1 = 200; // Valor normal base
+  int gas2 = 200; // Valor normal base
+
+  // Solo reportar valores altos si realmente hay humo
+  if (analog1 >= HUMO_UMBRAL)
+  {
+    gas1 = map(analog1, HUMO_UMBRAL, 1023, 280, 350);
+  }
+  if (analog2 >= HUMO_UMBRAL)
+  {
+    gas2 = map(analog2, HUMO_UMBRAL, 1023, 280, 350);
+  }
   Serial.print("\"gas_ppm\":{\"Z1\":");
   Serial.print(gas1);
   Serial.print(",\"Z2\":");

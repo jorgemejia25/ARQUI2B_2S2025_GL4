@@ -103,7 +103,9 @@ class BusStopWebSocketService {
   /// Manejar actualización de ETA desde mensaje de parada
   void _handleEtaUpdateFromStopMessage(Map<String, dynamic> data) {
     try {
-      final stopId = data['stop_id'] as String;
+      // Unificar IDs de paradas (algunos backends envían P2_2)
+      String stopId = data['stop_id'] as String;
+      if (stopId == 'P2_2') stopId = 'P2';
       final etaInfo = data['eta_info'] as Map<String, dynamic>;
       final alertData = data['data'] as Map<String, dynamic>;
 
@@ -119,6 +121,12 @@ class BusStopWebSocketService {
           origen: etaInfo['origen'] as String,
           severity: alertData['severity'] as int,
         ),
+      );
+
+      // Log de depuración de ETA recibido
+      // ignore: avoid_print
+      print(
+        '[WS Paradas] ETA: stop=$stopId tipo=${etaMessage.data.tipoTransporte} t=${etaMessage.data.tiempoSegundos}s origen=${etaMessage.data.origen}',
       );
 
       onEtaUpdate?.call(etaMessage);

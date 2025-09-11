@@ -31,8 +31,8 @@ class BusStopService {
         location: 'Centro',
       ),
       BusStop(
-        id: 'P2_2',
-        svgId: 'P2_2',
+        id: 'P2',
+        svgId: 'P2',
         displayName: 'Parada 2',
         location: 'Norte',
       ),
@@ -88,11 +88,8 @@ class BusStopService {
 
   // Cambiar color de parada según tipo de transporte
   void _changeBusStopColorByTransport(String stopId, String tipoTransporte) {
-    // Mapear stopId a los IDs usados en el SVG
+    // Mapear stopId a los IDs usados en el SVG (IDs unificados: P1..P4)
     String svgId = stopId;
-    if (stopId == 'P2_2') {
-      svgId = 'P2'; // El SVG usa P2_2 pero nuestro servicio usa P2
-    }
 
     // Cambiar estado en el servicio SVG
     SvgTrafficService.changeBusStopStateByTransport(svgId, tipoTransporte);

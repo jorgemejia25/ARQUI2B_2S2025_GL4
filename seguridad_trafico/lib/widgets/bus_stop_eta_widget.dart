@@ -114,7 +114,7 @@ class BusStopsEtaOverlay extends StatelessWidget {
   // Posiciones aproximadas de las paradas en el mapa (ajustar según el SVG)
   static const Map<String, Offset> busStopPositions = {
     'P1': Offset(50, 100),
-    'P2_2': Offset(200, 150),
+    'P2': Offset(200, 150),
     'P3': Offset(150, 250),
     'P4': Offset(300, 200),
   };

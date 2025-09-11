@@ -4,6 +4,12 @@
 # Biblioteca para comunicación serial
 pyserial>=3.5
 
+# Biblioteca para manejo de variables de entorno
+python-dotenv>=1.0.0
+
+# Biblioteca para comunicación MQTT
+paho-mqtt>=1.6.0
+
 # Para desarrollo y testing (opcional)
 # pytest>=7.0.0
 # pytest-cov>=4.0.0

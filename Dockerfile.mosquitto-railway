@@ -1,0 +1,15 @@
+# Dockerfile para Mosquitto en Railway
+FROM eclipse-mosquitto:latest
+
+# Copiar configuración personalizada
+COPY mosquitto-railway.conf /mosquitto/config/mosquitto.conf
+
+# Crear directorio de datos
+RUN mkdir -p /mosquitto/data
+
+# Exponer puertos
+EXPOSE 1883
+EXPOSE 9001
+
+# Comando de inicio
+CMD ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]

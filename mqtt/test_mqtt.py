@@ -6,11 +6,18 @@ Cliente MQTT simple para probar la funcionalidad del broker Mosquitto.
 import paho.mqtt.client as mqtt
 import time
 import json
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 # Configuración MQTT
-MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
-MQTT_TOPIC = "arduino/data"
+MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "arduino/data")
 MQTT_CLIENT_ID = "test_client"
 
 def on_connect(client, userdata, flags, rc):
@@ -44,6 +51,11 @@ def main():
     client.on_disconnect = on_disconnect
     
     try:
+        # Configurar autenticación si se proporcionan credenciales
+        if MQTT_USERNAME and MQTT_PASSWORD:
+            print(f"Configurando autenticación MQTT para usuario: {MQTT_USERNAME}")
+            client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        
         # Conectar al broker
         print(f"Conectando a {MQTT_BROKER}:{MQTT_PORT}...")
         client.connect(MQTT_BROKER, MQTT_PORT, 60)

@@ -479,12 +479,21 @@ class MQTTHandler:
 
                             # WS: /ws/alerts (para feed unificado de alertas)
                             alert_data = {
+                                "type": "infraction",  # Tipo que reconoce Flutter
                                 "timestamp": time.time(),
                                 "alert_type": "INFRACCION",
-                                "severity": 5,
+                                "severity": 4,  # Alta severidad
                                 "signal_id": signal_id,
                                 "signal_color": signal_color,
+                                "origen": f"Infracción semáforo {signal_id}",
+                                "data": {
+                                    "alert_type": "INFRACCION",
+                                    "signal_id": signal_id,
+                                    "signal_color": signal_color,
+                                    "severity": 4
+                                }
                             }
+                            logger.info(f"🚨 Enviando infracción por WebSocket: {signal_id} - {signal_color}")
                             await self.websocket_manager.emit_alert(alert_data)
 
                         logger.info("Procesadas todas las infracciones.")

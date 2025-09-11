@@ -12,6 +12,7 @@ import argparse
 import json
 import paho.mqtt.client as mqtt
 from paho.mqtt.client import CallbackAPIVersion
+from datetime import datetime
 
 # Imports directos para ejecutar desde el directorio mqtt
 from serial_receiver import ArduinoSerialReceiver, SerialConfig
@@ -220,6 +221,7 @@ class ArduinoMainController:
             # Configurar callbacks
             self.receiver.set_data_callback(self._on_data_received)
             self.receiver.set_error_callback(self._on_parse_error)
+            self.receiver.set_infraction_callback(self._on_infraction_detected)
             
             print("Callbacks configurados")
             print("Inicialización completada")
@@ -376,6 +378,45 @@ class ArduinoMainController:
         """
         print(f"\nError de parsing: {error_msg}")
         print(f"Datos crudos: {raw_data[:100]}...")
+    
+    def _on_infraction_detected(self, sd_num: int, semaforo_id: str, distancia: float):
+        """
+        Callback para infracciones detectadas en tiempo real.
+        
+        Args:
+            sd_num: Número del sensor SD (1-5)
+            semaforo_id: ID del semáforo infringido (S1-S10)
+            distancia: Distancia del vehículo en cm
+        """
+        print(f"\n🚨 INFRACCIÓN EN TIEMPO REAL:")
+        print(f"   Sensor: SD{sd_num}")
+        print(f"   Semáforo: {semaforo_id}")
+        print(f"   Distancia: {distancia}cm")
+        print(f"   Timestamp: {datetime.now().strftime('%H:%M:%S')}")
+        
+        # Crear datos simulados para MQTT
+        infraction_data = {
+            "timestamp": time.time(),
+            "alert_type": "INFRACCION",
+            "sensor_id": f"SD{sd_num}",
+            "semaforo_id": semaforo_id,
+            "distancia_cm": distancia,
+            "severity": 3  # Alta severidad
+        }
+        
+        # Publicar infracción inmediatamente por MQTT
+        if self.mqtt_connected:
+            try:
+                message = json.dumps(infraction_data, indent=2)
+                result = self.mqtt_client.publish(MQTT_TOPIC + "/infracciones", message)
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                    print(f"   ✓ Infracción publicada en MQTT")
+                else:
+                    print(f"   ✗ Error publicando infracción: {result.rc}")
+            except Exception as e:
+                print(f"   ✗ Error en MQTT infracción: {e}")
+        else:
+            print(f"   ⚠️ MQTT no conectado - infracción no publicada")
     
     def _process_semaforos(self, data: ArduinoDataParser):
         """Procesa información de semáforos con debug."""

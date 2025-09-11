@@ -26,7 +26,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DashboardSummary? _summary;
   GasChartData? _gasData;
   SeismicChartData? _seismicData;
-  List<DetailedBusStatus>? _busesStatus;
   DashboardMetrics? _metrics;
 
   bool _isLoading = true;
@@ -56,7 +55,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _apiService.getSummary(),
         _apiService.getGasChartData(),
         _apiService.getSeismicChartData(),
-        _apiService.getBusesStatus(),
         _apiService.getMetrics(),
       ]);
 
@@ -65,8 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _summary = futures[0] as DashboardSummary?;
           _gasData = futures[1] as GasChartData?;
           _seismicData = futures[2] as SeismicChartData?;
-          _busesStatus = futures[3] as List<DetailedBusStatus>?;
-          _metrics = futures[4] as DashboardMetrics?;
+          _metrics = futures[3] as DashboardMetrics?;
           _isLoading = false;
         });
       }
@@ -104,8 +101,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _buildChartsSection(),
                     const SizedBox(height: 24),
 
-                    // Estado de buses
-                    _buildBusesSection(),
+                    // Alertas del sistema
+                    _buildAlertsSection(),
                     const SizedBox(height: 24),
 
                     // Métricas del sistema
@@ -150,9 +147,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const Color(0xFFF59E0B),
             ),
             _buildSummaryCard(
-              'Buses Activos',
-              summary.busesStatus.length.toString(),
-              Icons.directions_bus_rounded,
+              'Tipos de Alertas',
+              summary.alertsSummary.length.toString(),
+              Icons.category_rounded,
               const Color(0xFF10B981),
             ),
             _buildSummaryCard(
@@ -256,12 +253,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBusesSection() {
+  Widget _buildAlertsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Estado de Transporte',
+          'Alertas del Sistema',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -269,24 +266,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 0.8,
-          crossAxisSpacing: 16,
-          children: [
-            _buildChartCard(
-              child: _busesStatus != null
-                  ? BusStatusChart(buses: _busesStatus!)
-                  : const Center(child: Text('Cargando estado de buses...')),
-            ),
-            _buildChartCard(
-              child: _summary != null
-                  ? AlertsChart(data: _summary!.alertsSummary)
-                  : const Center(child: Text('Cargando alertas...')),
-            ),
-          ],
+        _buildChartCard(
+          child: _summary != null
+              ? AlertsChart(data: _summary!.alertsSummary)
+              : const Center(child: Text('Cargando alertas...')),
         ),
       ],
     );

@@ -4,8 +4,12 @@ Rutas del API IoT - Puente MQTT
 
 from fastapi import APIRouter
 from typing import Dict, Any
+from data_endpoints import router as data_router
 
 router = APIRouter()
+
+# Incluir router de endpoints de datos
+router.include_router(data_router, prefix="/data", tags=["Datos"])
 
 @router.get("/")
 def read_root():

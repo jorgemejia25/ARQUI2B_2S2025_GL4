@@ -274,24 +274,30 @@ def get_gas_chart_data(hours: int = Query(24, ge=1, le=168)):
     """GET Dashboard: datos de gas para gráficas (últimas N horas)."""
     with DatabaseManager() as db:
         query = """
-        SELECT ts, ppm 
+        SELECT 
+            strftime('%H', ts) as hour,
+            AVG(ppm) as avg_ppm
         FROM GasMeasurement 
         WHERE ts >= datetime('now', '-{} hours')
-        ORDER BY ts ASC
+        GROUP BY strftime('%H', ts)
+        ORDER BY hour ASC
         """.format(hours)
-        return db.execute_query(query) or []
+        return {"gas_by_hour": db.execute_query(query) or []}
 
 @router.get("/dashboard/charts/seismic")
 def get_seismic_chart_data(hours: int = Query(24, ge=1, le=168)):
     """GET Dashboard: datos sísmicos para gráficas (últimas N horas)."""
     with DatabaseManager() as db:
         query = """
-        SELECT ts, intensity_g 
+        SELECT 
+            strftime('%H', ts) as hour,
+            AVG(intensity_g) as avg_intensity
         FROM SeismicMeasurement 
         WHERE ts >= datetime('now', '-{} hours')
-        ORDER BY ts ASC
+        GROUP BY strftime('%H', ts)
+        ORDER BY hour ASC
         """.format(hours)
-        return db.execute_query(query) or []
+        return {"seismic_by_hour": db.execute_query(query) or []}
 
 @router.get("/dashboard/charts/bus-positions")
 def get_bus_positions_chart_data(hours: int = Query(24, ge=1, le=168)):

@@ -194,9 +194,51 @@ class DatabaseManager:
     def _save_bus_data(self, topic: str, payload: Dict[str, Any]) -> bool:
         """Guardar datos de buses"""
         try:
-            # Aquí implementarías la lógica específica para guardar datos de buses
-            logger.info(f"Guardando datos de bus: {topic} - {payload}")
-            return True
+            logger.info(f"Procesando datos de bus: {topic} - {payload}")
+            
+            # Extraer datos del payload
+            bus_code = payload.get("bus_code", "")
+            latitude = payload.get("latitude")
+            longitude = payload.get("longitude")
+            speed_kmh = payload.get("speed_kmh")
+            distance_to_next_stop_m = payload.get("distance_to_next_stop_m")
+            
+            # Validar que tenemos datos mínimos
+            if not bus_code or latitude is None or longitude is None:
+                logger.warning(f"Datos de bus incompletos: {payload}")
+                return False
+            
+            # Obtener bus_id del código
+            bus_query = "SELECT bus_id FROM Bus WHERE code = ?"
+            bus_result = self.execute_query(bus_query, (bus_code,))
+            
+            if not bus_result:
+                logger.warning(f"Bus no encontrado con código: {bus_code}")
+                return False
+            
+            bus_id = bus_result[0]["bus_id"]
+            
+            # Insertar posición del bus
+            position_query = """
+            INSERT INTO BusPosition (bus_id, ts, latitude, longitude, speed_kmh, distance_to_next_stop_m) 
+            VALUES (?, datetime('now'), ?, ?, ?, ?)
+            """
+            
+            result = self.execute_query(position_query, (
+                bus_id,
+                latitude,
+                longitude,
+                speed_kmh,
+                distance_to_next_stop_m
+            ))
+            
+            if result is not None:
+                logger.info(f"Posición de bus guardada: {bus_code} - Lat: {latitude}, Lng: {longitude}")
+                return True
+            else:
+                logger.error(f"Error insertando posición de bus: {bus_code}")
+                return False
+                
         except Exception as e:
             logger.error(f"Error guardando datos de bus: {e}")
             return False

@@ -11,7 +11,7 @@ import sys
 def test_serial_raw():
     """Prueba la lectura de datos crudos del Arduino."""
     port = '/dev/ttyACM0'
-    baudrate = 9600
+    baudrate = 115200
     
     print(f"Conectando a {port} con baudrate {baudrate}...")
     

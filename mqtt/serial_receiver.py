@@ -119,6 +119,12 @@ class ArduinoSerialReceiver:
                     self.logger.info(f"Conexión serial establecida en {port}")
                     # Actualizar la configuración con el puerto que funcionó
                     self.config.port = port
+                    # Limpiar buffer de arranque/bootloader
+                    try:
+                        self.serial_connection.reset_input_buffer()
+                        self.serial_connection.reset_output_buffer()
+                    except Exception:
+                        pass
                     return True
                 else:
                     self.logger.warning(f"No se pudo abrir la conexión en {port}")
@@ -207,6 +213,11 @@ class ArduinoSerialReceiver:
         Args:
             data_line: Línea de datos JSON recibida
         """
+        # Ignorar líneas que no sean JSON (Arduino emite líneas de eventos y depuración)
+        stripped = data_line.lstrip()
+        if not stripped.startswith('{'):
+            return
+
         try:
             # Usar el parser especializado para Arduino
             parsed_data = parse_arduino_json(data_line)
@@ -307,8 +318,8 @@ def main():
     """Función principal para pruebas del módulo."""
     # Configuración por defecto
     config = SerialConfig(
-        port='/dev/ttyUSB0', 
-        baudrate=9600
+        port='/dev/ttyACM0', 
+        baudrate=115200
     )
     
     # Crear instancia del receptor

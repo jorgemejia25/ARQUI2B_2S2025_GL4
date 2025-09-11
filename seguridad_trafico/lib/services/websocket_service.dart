@@ -13,7 +13,8 @@ class WebSocketService {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
   bool _isConnected = false;
-  String _url = 'ws://192.168.1.172:8001/ws/traffic';
+  String _url =
+      'ws://arqui2b2s2025gl4-production.up.railway.app:8001/ws/traffic';
 
   // Callbacks para manejar los mensajes
   Function(WebSocketMessage)? onTrafficUpdate;

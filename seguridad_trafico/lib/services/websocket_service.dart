@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/websocket_message.dart';
 import '../models/traffic_light.dart';
+import 'websocket_alerts.dart';
 
 class WebSocketService {
   static WebSocketService? _instance;
@@ -131,11 +132,29 @@ class WebSocketService {
     final alertType = violationType == 'red_light'
         ? 'INFRACCION'
         : 'SIGNAL_UPDATE';
-    final severity = violationType == 'red_light' ? 3 : 1;
+    final severity = violationType == 'red_light'
+        ? 4
+        : 1; // Alta severidad para infracciones
+
+    print('🚦 [WEBSOCKET-TRAFFIC] Mensaje recibido:');
+    print('   - Signal ID: $signalId');
+    print('   - Signal Color: $signalColor');
+    print('   - Violation Type: $violationType');
+    print('   - Alert Type: $alertType');
+    print('   - Severity: $severity');
+
+    // SI ES UNA INFRACCIÓN, también enviarla al canal de alertas
+    if (violationType == 'red_light') {
+      print(
+        '🚨 [WEBSOCKET-TRAFFIC] ¡INFRACCIÓN DETECTADA! Enviando a alertas...',
+      );
+      _forwardInfractionToAlertsService(signalId, signalColor, fullMessage);
+    }
 
     // Mapear el ID del semáforo del WebSocket al ID del SVG
     final svgId = _mapSignalIdToSvgId(signalId);
     if (svgId == null) {
+      print('❌ [WEBSOCKET-TRAFFIC] ID no válido para SVG: $signalId');
       return;
     }
 
@@ -143,6 +162,7 @@ class WebSocketService {
     final trafficState = _mapColorToTrafficState(signalColor);
 
     if (trafficState == null) {
+      print('❌ [WEBSOCKET-TRAFFIC] Color no válido: $signalColor');
       return;
     }
 
@@ -164,6 +184,7 @@ class WebSocketService {
       ),
     );
 
+    print('✅ [WEBSOCKET-TRAFFIC] Enviando actualización al mapa');
     onTrafficUpdate?.call(simplifiedMessage);
   }
 
@@ -318,6 +339,42 @@ class WebSocketService {
 
     final jsonString = json.encode(requestMessage);
     sendMessage(jsonString);
+  }
+
+  /// Reenviar infracción al servicio de alertas para que aparezca en notificaciones
+  void _forwardInfractionToAlertsService(
+    String signalId,
+    String signalColor,
+    Map<String, dynamic> fullMessage,
+  ) {
+    try {
+      final alertsService = WebSocketAlertsService.instance;
+
+      // Crear mensaje de infracción para el canal de alertas
+      final infractionAlert = {
+        "type": "traffic_violation",
+        "timestamp": DateTime.now().millisecondsSinceEpoch / 1000.0,
+        "data": {
+          "alert_type": "INFRACCION",
+          "signal_id": signalId,
+          "signal_color": signalColor,
+          "violation_type": "red_light",
+          "origen": "Semáforo $signalId - Luz roja",
+          "severity": 4,
+          "ts": DateTime.now().millisecondsSinceEpoch / 1000.0,
+        },
+      };
+
+      print('📡 [WEBSOCKET-TRAFFIC] Reenviando infracción a alertas:');
+      print('   - Mensaje: ${json.encode(infractionAlert)}');
+
+      // Simular llegada del mensaje al servicio de alertas
+      alertsService.simulateInfractionMessage(infractionAlert);
+
+      print('✅ [WEBSOCKET-TRAFFIC] Infracción enviada a alertas exitosamente');
+    } catch (e) {
+      print('❌ [WEBSOCKET-TRAFFIC] Error enviando infracción a alertas: $e');
+    }
   }
 
   /// Programar reconexión automática con backoff exponencial

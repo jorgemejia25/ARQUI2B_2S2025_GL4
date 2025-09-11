@@ -67,6 +67,14 @@ class MQTTHandler:
             logger.info(f"Payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
             logger.info("==========================")
             
+            # Log específico para infracciones
+            if topic == "arduino/data/infracciones":
+                logger.error("🚨🚨🚨 INFRACCIÓN RECIBIDA EN API 🚨🚨🚨")
+                logger.error(f"DATOS DE INFRACCIÓN: {payload}")
+                print("\n🚨🚨🚨 INFRACCIÓN MQTT RECIBIDA EN API! 🚨🚨🚨")
+                print(f"Datos: {payload}")
+                print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
+            
             # Guardar en la base de datos
             try:
                 success = self.db_manager.save_mqtt_data(topic, payload)

@@ -16,6 +16,7 @@ MQTT_USERNAME = os.getenv("MQTT_USERNAME", "jorge")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "34eikykmbd8w5igpjiebialeisx0yu02")
 MQTT_TOPICS = [
     "arduino/data",
+    "arduino/data/infracciones",  # Tópico específico para infracciones en tiempo real
 ]
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

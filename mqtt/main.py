@@ -117,6 +117,7 @@ class ArduinoMainController:
     def _publish_mqtt(self, data: ArduinoDataParser):
         """Publica datos en el tópico MQTT."""
         if not self.mqtt_connected:
+            print("⚠️ MQTT no conectado - datos no publicados")
             return
         
         try:
@@ -128,7 +129,9 @@ class ArduinoMainController:
             result = self.mqtt_client.publish(MQTT_TOPIC, message)
             
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                print(f"✓ Datos publicados en MQTT - {data.timestamp}")
+                eta_count = len(data.eta)
+                gas_alerts = len([g for g in data.gas if g.ppm >= 260])
+                print(f"✓ MQTT publicado - {data.timestamp} | ETAs: {eta_count} | Gas alto: {gas_alerts}")
             else:
                 print(f"✗ Error al publicar MQTT (código: {result.rc})")
                 
@@ -409,17 +412,23 @@ class ArduinoMainController:
                     self.alertas_activas.remove(alerta_id)
     
     def _process_gas(self, data: ArduinoDataParser):
-        """Procesa información de sensores de gas."""
+        """Procesa información de sensores de gas con histéresis."""
         for gas in data.gas:
-            if gas.is_alto:
-                alerta_id = f"gas_alto_{gas.zona}"
-                if alerta_id not in self.alertas_activas:
+            alerta_id = f"gas_alto_{gas.zona}"
+            
+            # Histéresis: umbral alto para activar, umbral bajo para desactivar
+            umbral_activacion = 260  # Mayor que el umbral normal (250)
+            umbral_desactivacion = 240  # Menor que el umbral normal
+            
+            if alerta_id not in self.alertas_activas:
+                # Solo activar si supera el umbral de activación
+                if gas.ppm >= umbral_activacion:
                     print(f"ALERTA: Gas alto en zona {gas.zona} ({gas.ppm} ppm)")
                     self.alertas_activas.add(alerta_id)
             else:
-                # Remover alerta si el gas ya no está alto
-                alerta_id = f"gas_alto_{gas.zona}"
-                if alerta_id in self.alertas_activas:
+                # Solo desactivar si baja del umbral de desactivación
+                if gas.ppm < umbral_desactivacion:
+                    print(f"INFO: Gas normalizado en zona {gas.zona} ({gas.ppm} ppm)")
                     self.alertas_activas.remove(alerta_id)
     
     def _process_sismo(self, data: ArduinoDataParser):

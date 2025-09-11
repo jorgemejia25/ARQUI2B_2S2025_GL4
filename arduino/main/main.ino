@@ -615,12 +615,6 @@ void emitStatusJson()
     etaFirst = false;
   }
 
-  // ETA para paradas adicionales (P5, P6) - simulados
-  if (!etaFirst)
-    Serial.print(',');
-  Serial.print("\"P5\":\"TU,ETA_S=120,FROM=Zona2,TO=P5\",");
-  Serial.print("\"P6\":\"M,ETA_S=180,FROM=Estacion3,TO=P6\"");
-
   Serial.print("},");
 
   Serial.print("\"_protocol_version\":\"1.1\"}");

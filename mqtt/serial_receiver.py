@@ -112,8 +112,8 @@ class ArduinoSerialReceiver:
                     stopbits=self.config.stopbits
                 )
                 
-                # Esperar a que Arduino se reinicie
-                time.sleep(2)
+                # Esperar a que Arduino se reinicie y estabilice
+                time.sleep(3)
                 
                 if self.serial_connection.is_open:
                     self.logger.info(f"Conexión serial establecida en {port}")

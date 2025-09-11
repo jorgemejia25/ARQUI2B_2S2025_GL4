@@ -15,6 +15,9 @@ class BusStopWebSocketService {
   bool _isConnected = false;
   final String _url =
       'wss://arqui2b2s2025gl4-production.up.railway.app/ws/stops';
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
 
   // Callbacks para manejar los mensajes
   Function(EtaUpdateMessage)? onEtaUpdate;
@@ -46,12 +49,14 @@ class BusStopWebSocketService {
   /// Desconectar del WebSocket
   Future<void> disconnect() async {
     try {
+      _reconnectTimer?.cancel();
       await _subscription?.cancel();
       await _channel?.sink.close();
       _isConnected = false;
+      _reconnectAttempts = 0;
       onDisconnected?.call();
     } catch (e) {
-      // Error desconectando WebSocket
+      print('Error desconectando WebSocket de paradas: $e');
     }
   }
 
@@ -130,12 +135,24 @@ class BusStopWebSocketService {
   /// Manejar errores de WebSocket
   void _handleError(dynamic error) {
     _isConnected = false;
-    onError?.call('Error en WebSocket de paradas: $error');
+    print('WebSocket de paradas Error: $error');
+
+    // Manejar diferentes tipos de errores
+    if (error.toString().contains('SocketException')) {
+      print(
+        'SocketException detectada en WebSocket de paradas - intentando reconectar...',
+      );
+      _scheduleReconnect();
+    } else {
+      onError?.call('Error en WebSocket de paradas: $error');
+    }
   }
 
   /// Manejar desconexión
   void _handleDisconnection() {
     _isConnected = false;
+    print('WebSocket de paradas desconectado - intentando reconectar...');
+    _scheduleReconnect();
     onDisconnected?.call();
   }
 
@@ -172,5 +189,40 @@ class BusStopWebSocketService {
     } catch (e) {
       return false;
     }
+  }
+
+  /// Programar reconexión automática con backoff exponencial
+  void _scheduleReconnect() {
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      print(
+        'Máximo número de intentos de reconexión alcanzado para WebSocket de paradas',
+      );
+      onError?.call(
+        'No se pudo reconectar WebSocket de paradas después de $_maxReconnectAttempts intentos',
+      );
+      return;
+    }
+
+    _reconnectTimer?.cancel();
+    _reconnectAttempts++;
+
+    // Backoff exponencial: 2, 4, 8, 16, 32 segundos
+    final delay = Duration(seconds: 2 * _reconnectAttempts);
+    print(
+      'Reconectando WebSocket de paradas en ${delay.inSeconds} segundos (intento $_reconnectAttempts/$_maxReconnectAttempts)',
+    );
+
+    _reconnectTimer = Timer(delay, () async {
+      try {
+        await connect();
+        if (_isConnected) {
+          _reconnectAttempts = 0; // Resetear contador en conexión exitosa
+          print('Reconexión exitosa del WebSocket de paradas');
+        }
+      } catch (e) {
+        print('Error en reconexión del WebSocket de paradas: $e');
+        _scheduleReconnect(); // Intentar de nuevo
+      }
+    });
   }
 }

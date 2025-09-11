@@ -14,6 +14,9 @@ class WebSocketService {
   StreamSubscription? _subscription;
   bool _isConnected = false;
   String _url = 'wss://arqui2b2s2025gl4-production.up.railway.app/ws/traffic';
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
 
   // Callbacks para manejar los mensajes
   Function(WebSocketMessage)? onTrafficUpdate;
@@ -61,12 +64,14 @@ class WebSocketService {
   /// Desconectar del WebSocket
   Future<void> disconnect() async {
     try {
+      _reconnectTimer?.cancel();
       await _subscription?.cancel();
       await _channel?.sink.close();
       _isConnected = false;
+      _reconnectAttempts = 0;
       onDisconnected?.call();
     } catch (e) {
-      // Error desconectando WebSocket
+      print('Error desconectando WebSocket: $e');
     }
   }
 
@@ -223,12 +228,22 @@ class WebSocketService {
   /// Manejar errores
   void _handleError(dynamic error) {
     _isConnected = false;
-    onError?.call('Error en WebSocket: $error');
+    print('WebSocket Error: $error');
+
+    // Manejar diferentes tipos de errores
+    if (error.toString().contains('SocketException')) {
+      print('SocketException detectada - intentando reconectar...');
+      _scheduleReconnect();
+    } else {
+      onError?.call('Error en WebSocket: $error');
+    }
   }
 
   /// Manejar desconexión
   void _handleDisconnection() {
     _isConnected = false;
+    print('WebSocket desconectado - intentando reconectar...');
+    _scheduleReconnect();
     onDisconnected?.call();
   }
 
@@ -303,5 +318,38 @@ class WebSocketService {
 
     final jsonString = json.encode(requestMessage);
     sendMessage(jsonString);
+  }
+
+  /// Programar reconexión automática con backoff exponencial
+  void _scheduleReconnect() {
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      print('Máximo número de intentos de reconexión alcanzado');
+      onError?.call(
+        'No se pudo reconectar después de $_maxReconnectAttempts intentos',
+      );
+      return;
+    }
+
+    _reconnectTimer?.cancel();
+    _reconnectAttempts++;
+
+    // Backoff exponencial: 2, 4, 8, 16, 32 segundos
+    final delay = Duration(seconds: 2 * _reconnectAttempts);
+    print(
+      'Reconectando en ${delay.inSeconds} segundos (intento $_reconnectAttempts/$_maxReconnectAttempts)',
+    );
+
+    _reconnectTimer = Timer(delay, () async {
+      try {
+        await connect();
+        if (_isConnected) {
+          _reconnectAttempts = 0; // Resetear contador en conexión exitosa
+          print('Reconexión exitosa');
+        }
+      } catch (e) {
+        print('Error en reconexión: $e');
+        _scheduleReconnect(); // Intentar de nuevo
+      }
+    });
   }
 }

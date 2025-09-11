@@ -885,3 +885,6 @@ Para soporte técnico o consultas adicionales, contactar al equipo de desarrollo
 **Versión del Manual:** 1.0  
 **Última Actualización:** Enero 2024  
 **Compatibilidad:** API v1.0.0
+
+
+

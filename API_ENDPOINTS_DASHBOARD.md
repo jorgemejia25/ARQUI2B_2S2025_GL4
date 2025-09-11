@@ -311,3 +311,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 3. **Refresh**: Agrega funcionalidad de pull-to-refresh
 4. **Filtros**: Implementa filtros por fecha/hora en la UI
 5. **Notificaciones**: Usa los datos de alertas para notificaciones push
+
+
+

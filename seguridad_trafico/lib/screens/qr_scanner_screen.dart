@@ -70,7 +70,11 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   @override
   void dispose() {
-    controller?.dispose();
+    try {
+      controller?.dispose();
+    } catch (e) {
+      print('Error al liberar el controlador de la cámara: $e');
+    }
     super.dispose();
   }
 
@@ -115,10 +119,14 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                       ? MobileScanner(
                           controller: controller!,
                           onDetect: (capture) {
-                            final barcode = capture.barcodes.first;
-                            final value = barcode.rawValue;
-                            if (value != null && value != lastValue) {
-                              setState(() => lastValue = value);
+                            try {
+                              final barcode = capture.barcodes.first;
+                              final value = barcode.rawValue;
+                              if (value != null && value != lastValue) {
+                                setState(() => lastValue = value);
+                              }
+                            } catch (e) {
+                              print('Error procesando código QR: $e');
                             }
                           },
                         )

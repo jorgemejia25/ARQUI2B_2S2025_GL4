@@ -421,8 +421,8 @@ class ArduinoMainController:
             if dist.id in paradas_importantes:
                 alerta_id = f"vehiculo_parada_{dist.id}"
                 
-                # Umbral de detección de vehículos (basado en Arduino THR_STOP_CM = 6.0)
-                if dist.distancia_cm < 8.0:  # Vehículo presente
+                # Umbral de detección de vehículos (más sensible para detectar mejor)
+                if dist.distancia_cm < 15.0:  # Vehículo presente
                     if alerta_id not in self.alertas_activas:
                         print(f"🚌 VEHÍCULO DETECTADO: {dist.id} - {dist.distancia_cm:.1f} cm")
                         self.alertas_activas.add(alerta_id)

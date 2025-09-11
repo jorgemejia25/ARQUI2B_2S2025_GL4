@@ -305,11 +305,12 @@ class MQTTHandler:
                     # Procesar datos de ETA (tiempos de llegada de buses)
                     if "eta" in payload and payload["eta"]:
                         eta_data = payload["eta"]
+                        logger.info(f"🚌 DATOS ETA RECIBIDOS: {eta_data}")
                         logger.info(f"Procesando {len(eta_data)} ETAs de transporte...")
                         
-                        # Definir categorías de paradas correctas
-                        PARADAS_TRANSMETRO = ["P1", "P2"]
-                        PARADAS_TRANSURBANO = ["P3", "P4"]
+                        # Definir categorías de paradas correctas (según mapeo del Arduino)
+                        PARADAS_TRANSMETRO = ["P3", "P4"]  # TM1, TM2
+                        PARADAS_TRANSURBANO = ["P1", "P2"]  # TU3, TU4
                         
                         # El Arduino envía eta como array de objetos con información completa
                         for eta_item in eta_data:

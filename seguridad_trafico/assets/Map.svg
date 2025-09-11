@@ -25,28 +25,28 @@
 </g>
 </g>
 <g id="Paradas">
-<g id="P1" filter="url(#filter0_d_4_4)">
+<g id="P1">
 <g clip-path="url(#clip1_4_4)">
 <rect x="13" y="85.0396" width="63.7779" height="63.7779" rx="31.8889" transform="rotate(-70.2857 13 85.0396)" fill="white"/>
 <circle id="Ellipse 1" cx="54" cy="66" r="26" fill="#51A248"/>
 <path id="P2" d="M46.0114 71V59.3636H50.6023C51.4848 59.3636 52.2367 59.5322 52.858 59.8693C53.4792 60.2027 53.9527 60.6667 54.2784 61.2614C54.608 61.8523 54.7727 62.5341 54.7727 63.3068C54.7727 64.0795 54.6061 64.7614 54.2727 65.3523C53.9394 65.9432 53.4564 66.4034 52.8239 66.733C52.1951 67.0625 51.4337 67.2273 50.5398 67.2273H47.6136V65.2557H50.142C50.6155 65.2557 51.0057 65.1742 51.3125 65.0114C51.6231 64.8447 51.8542 64.6155 52.0057 64.3239C52.161 64.0284 52.2386 63.6894 52.2386 63.3068C52.2386 62.9205 52.161 62.5833 52.0057 62.2955C51.8542 62.0038 51.6231 61.7784 51.3125 61.6193C51.0019 61.4564 50.608 61.375 50.1307 61.375H48.4716V71H46.0114ZM56.3026 71V69.2273L60.4446 65.392C60.7969 65.0511 61.0923 64.7443 61.331 64.4716C61.5734 64.1989 61.7571 63.9318 61.8821 63.6705C62.0071 63.4053 62.0696 63.1193 62.0696 62.8125C62.0696 62.4716 61.992 62.178 61.8366 61.9318C61.6813 61.6818 61.4692 61.4905 61.2003 61.358C60.9313 61.2216 60.6264 61.1534 60.2855 61.1534C59.9295 61.1534 59.6188 61.2254 59.3537 61.3693C59.0885 61.5133 58.884 61.7197 58.7401 61.9886C58.5961 62.2576 58.5241 62.5777 58.5241 62.9489H56.1889C56.1889 62.1875 56.3613 61.5265 56.706 60.9659C57.0507 60.4053 57.5336 59.9716 58.1548 59.6648C58.776 59.358 59.492 59.2045 60.3026 59.2045C61.1359 59.2045 61.8613 59.3523 62.4787 59.6477C63.0999 59.9394 63.5829 60.3447 63.9276 60.8636C64.2723 61.3826 64.4446 61.9773 64.4446 62.6477C64.4446 63.0871 64.3575 63.5208 64.1832 63.9489C64.0128 64.3769 63.7079 64.8523 63.2685 65.375C62.8291 65.8939 62.2098 66.517 61.4105 67.2443L59.7116 68.9091V68.9886H64.598V71H56.3026Z" fill="white"/>
 </g>
 </g>
-<g id="P2_2" filter="url(#filter1_d_4_4)">
+<g id="P2_2">
 <g clip-path="url(#clip2_4_4)">
 <rect x="533" y="819.04" width="63.7779" height="63.7779" rx="31.8889" transform="rotate(-70.2857 533 819.04)" fill="white"/>
 <circle id="Ellipse 1_2" cx="574" cy="800" r="26" fill="#51A248"/>
 <path id="P2_3" d="M566.011 805V793.364H570.602C571.485 793.364 572.237 793.532 572.858 793.869C573.479 794.203 573.953 794.667 574.278 795.261C574.608 795.852 574.773 796.534 574.773 797.307C574.773 798.08 574.606 798.761 574.273 799.352C573.939 799.943 573.456 800.403 572.824 800.733C572.195 801.062 571.434 801.227 570.54 801.227H567.614V799.256H570.142C570.616 799.256 571.006 799.174 571.312 799.011C571.623 798.845 571.854 798.616 572.006 798.324C572.161 798.028 572.239 797.689 572.239 797.307C572.239 796.92 572.161 796.583 572.006 796.295C571.854 796.004 571.623 795.778 571.312 795.619C571.002 795.456 570.608 795.375 570.131 795.375H568.472V805H566.011ZM581.365 793.364V805H578.905V795.699H578.837L576.172 797.369V795.188L579.053 793.364H581.365Z" fill="white"/>
 </g>
 </g>
-<g id="P4" filter="url(#filter2_d_4_4)">
+<g id="P4">
 <g clip-path="url(#clip3_4_4)">
 <rect x="350" y="668.04" width="63.7779" height="63.7779" rx="31.8889" transform="rotate(-70.2857 350 668.04)" fill="white"/>
 <circle id="Ellipse 1_3" cx="391" cy="649" r="26" fill="#4869A2"/>
 <path id="P4_2" d="M383.011 654V642.364H387.602C388.485 642.364 389.237 642.532 389.858 642.869C390.479 643.203 390.953 643.667 391.278 644.261C391.608 644.852 391.773 645.534 391.773 646.307C391.773 647.08 391.606 647.761 391.273 648.352C390.939 648.943 390.456 649.403 389.824 649.733C389.195 650.062 388.434 650.227 387.54 650.227H384.614V648.256H387.142C387.616 648.256 388.006 648.174 388.312 648.011C388.623 647.845 388.854 647.616 389.006 647.324C389.161 647.028 389.239 646.689 389.239 646.307C389.239 645.92 389.161 645.583 389.006 645.295C388.854 645.004 388.623 644.778 388.312 644.619C388.002 644.456 387.608 644.375 387.131 644.375H385.472V654H383.011ZM393.126 651.955V650.017L397.984 642.364H399.655V645.045H398.666L395.604 649.892V649.983H402.507V651.955H393.126ZM398.712 654V651.364L398.757 650.506V642.364H401.064V654H398.712Z" fill="white"/>
 </g>
 </g>
-<g id="P3" filter="url(#filter3_d_4_4)">
+<g id="P3">
 <g clip-path="url(#clip4_4_4)">
 <rect x="194" y="219.04" width="63.7779" height="63.7779" rx="31.8889" transform="rotate(-70.2857 194 219.04)" fill="white"/>
 <circle id="Ellipse 1_4" cx="235" cy="200" r="26" fill="#4869A2"/>
@@ -68,46 +68,6 @@
 </g>
 </g>
 <defs>
-<filter id="filter0_d_4_4" x="-2" y="10" width="111.554" height="111.554" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-<feFlood flood-opacity="0" result="BackgroundImageFix"/>
-<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-<feMorphology radius="15" operator="dilate" in="SourceAlpha" result="effect1_dropShadow_4_4"/>
-<feOffset/>
-<feComposite in2="hardAlpha" operator="out"/>
-<feColorMatrix type="matrix" values="0 0 0 0 0.319242 0 0 0 0 0.635836 0 0 0 0 0.284065 0 0 0 0.35 0"/>
-<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_4_4"/>
-<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_4_4" result="shape"/>
-</filter>
-<filter id="filter1_d_4_4" x="518" y="744" width="111.554" height="111.554" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-<feFlood flood-opacity="0" result="BackgroundImageFix"/>
-<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-<feMorphology radius="15" operator="dilate" in="SourceAlpha" result="effect1_dropShadow_4_4"/>
-<feOffset/>
-<feComposite in2="hardAlpha" operator="out"/>
-<feColorMatrix type="matrix" values="0 0 0 0 0.319242 0 0 0 0 0.635836 0 0 0 0 0.284065 0 0 0 0.35 0"/>
-<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_4_4"/>
-<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_4_4" result="shape"/>
-</filter>
-<filter id="filter2_d_4_4" x="335" y="593" width="111.554" height="111.554" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-<feFlood flood-opacity="0" result="BackgroundImageFix"/>
-<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-<feMorphology radius="15" operator="dilate" in="SourceAlpha" result="effect1_dropShadow_4_4"/>
-<feOffset/>
-<feComposite in2="hardAlpha" operator="out"/>
-<feColorMatrix type="matrix" values="0 0 0 0 0.284065 0 0 0 0 0.413048 0 0 0 0 0.635836 0 0 0 0.56 0"/>
-<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_4_4"/>
-<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_4_4" result="shape"/>
-</filter>
-<filter id="filter3_d_4_4" x="179" y="144" width="111.554" height="111.554" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-<feFlood flood-opacity="0" result="BackgroundImageFix"/>
-<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-<feMorphology radius="15" operator="dilate" in="SourceAlpha" result="effect1_dropShadow_4_4"/>
-<feOffset/>
-<feComposite in2="hardAlpha" operator="out"/>
-<feColorMatrix type="matrix" values="0 0 0 0 0.284065 0 0 0 0 0.413048 0 0 0 0 0.635836 0 0 0 0.56 0"/>
-<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_4_4"/>
-<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_4_4" result="shape"/>
-</filter>
 <clipPath id="clip0_4_4">
 <rect width="628" height="852" fill="white"/>
 </clipPath>

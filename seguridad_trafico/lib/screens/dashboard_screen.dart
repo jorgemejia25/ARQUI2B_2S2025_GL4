@@ -51,23 +51,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadDashboardData() async {
-    final futures = await Future.wait([
-      _apiService.getSummary(),
-      _apiService.getGasChartData(),
-      _apiService.getSeismicChartData(),
-      _apiService.getBusesStatus(),
-      _apiService.getMetrics(),
-    ]);
+    try {
+      final futures = await Future.wait([
+        _apiService.getSummary(),
+        _apiService.getGasChartData(),
+        _apiService.getSeismicChartData(),
+        _apiService.getBusesStatus(),
+        _apiService.getMetrics(),
+      ]);
 
-    if (mounted) {
-      setState(() {
-        _summary = futures[0] as DashboardSummary?;
-        _gasData = futures[1] as GasChartData?;
-        _seismicData = futures[2] as SeismicChartData?;
-        _busesStatus = futures[3] as List<DetailedBusStatus>?;
-        _metrics = futures[4] as DashboardMetrics?;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _summary = futures[0] as DashboardSummary?;
+          _gasData = futures[1] as GasChartData?;
+          _seismicData = futures[2] as SeismicChartData?;
+          _busesStatus = futures[3] as List<DetailedBusStatus>?;
+          _metrics = futures[4] as DashboardMetrics?;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -151,7 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'Gas Actual',
               summary.latestGas.isNotEmpty
                   ? '${summary.latestGas.first.ppm.toStringAsFixed(1)} PPM'
-                  : 'Sin datos',
+                  : '0.0 PPM',
               Icons.air_rounded,
               const Color(0xFF3B82F6),
             ),
@@ -159,7 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'Actividad Sísmica',
               summary.latestSeismic.isNotEmpty
                   ? '${summary.latestSeismic.first.intensityG.toStringAsFixed(2)} G'
-                  : 'Sin datos',
+                  : '0.00 G',
               Icons.vibration_rounded,
               const Color(0xFFEF4444),
             ),

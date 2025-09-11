@@ -14,7 +14,7 @@ class BusStopWebSocketService {
   StreamSubscription? _subscription;
   bool _isConnected = false;
   final String _url =
-      'ws://arqui2b2s2025gl4-production.up.railway.app/ws/stops';
+      'wss://arqui2b2s2025gl4-production.up.railway.app/ws/stops';
 
   // Callbacks para manejar los mensajes
   Function(EtaUpdateMessage)? onEtaUpdate;

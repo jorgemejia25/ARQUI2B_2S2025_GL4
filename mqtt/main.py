@@ -378,57 +378,97 @@ class ArduinoMainController:
         print(f"Datos crudos: {raw_data[:100]}...")
     
     def _process_semaforos(self, data: ArduinoDataParser):
-        """Procesa información de semáforos."""
+        """Procesa información de semáforos con debug."""
         # Contar por estado
         verdes = len(data.semaforos_verdes)
         rojos = len(data.semaforos_rojos)
         amarillos = len(data.semaforos_amarillos)
         
+        # Debug periódico del estado de semáforos
+        if not hasattr(self, 'semaforo_debug_counter'):
+            self.semaforo_debug_counter = 0
+        self.semaforo_debug_counter += 1
+        
+        if self.semaforo_debug_counter % 25 == 0:  # Cada 25 lecturas
+            print(f"🚦 ESTADO SEMÁFOROS: Verde={verdes}, Amarillo={amarillos}, Rojo={rojos}")
+            # Mostrar algunos ejemplos
+            if data.semaforos_verdes:
+                ejemplos_verdes = [s.id for s in data.semaforos_verdes[:3]]
+                print(f"   Verdes: {', '.join(ejemplos_verdes)}")
+            if data.semaforos_rojos:
+                ejemplos_rojos = [s.id for s in data.semaforos_rojos[:3]]
+                print(f"   Rojos: {', '.join(ejemplos_rojos)}")
+        
         # Alerta si hay muchos semáforos en rojo
         if rojos >= 5:
             alerta_id = "muchos_semaforos_rojos"
             if alerta_id not in self.alertas_activas:
-                print(f"ALERTA: {rojos} semáforos en ROJO!")
+                print(f"🚨 CONGESTIÓN: {rojos}/10 semáforos en ROJO!")
                 self.alertas_activas.add(alerta_id)
         else:
             # Remover alerta si ya no hay muchos rojos
             alerta_id = "muchos_semaforos_rojos"
             if alerta_id in self.alertas_activas:
+                print(f"✅ TRÁFICO MEJORADO: {rojos}/10 semáforos en rojo")
                 self.alertas_activas.remove(alerta_id)
     
     def _process_distancias(self, data: ArduinoDataParser):
-        """Procesa información de distancias."""
-        # Verificar distancias críticas
+        """Procesa información de distancias con detección de paradas."""
+        # Mapeo de sensores: P1=TU3, P2=TU4, P3=TM1, P4=TM2, P5/P6=sin sensor real
+        paradas_importantes = ['P1', 'P2', 'P3', 'P4']  # Solo las que tienen sensores reales
+        
         for dist in data.distancias:
-            if dist.distancia_cm < 10:  # Muy cerca
-                alerta_id = f"distancia_critica_{dist.id}"
-                if alerta_id not in self.alertas_activas:
-                    print(f"ALERTA: {dist.id} muy cerca ({dist.distancia_cm:.1f} cm)")
-                    self.alertas_activas.add(alerta_id)
+            if dist.id in paradas_importantes:
+                alerta_id = f"vehiculo_parada_{dist.id}"
+                
+                # Umbral de detección de vehículos (basado en Arduino THR_STOP_CM = 6.0)
+                if dist.distancia_cm < 8.0:  # Vehículo presente
+                    if alerta_id not in self.alertas_activas:
+                        print(f"🚌 VEHÍCULO DETECTADO: {dist.id} - {dist.distancia_cm:.1f} cm")
+                        self.alertas_activas.add(alerta_id)
+                else:  # Vehículo ausente
+                    if alerta_id in self.alertas_activas:
+                        print(f"🚌 VEHÍCULO SALIÓ: {dist.id} - {dist.distancia_cm:.1f} cm")
+                        self.alertas_activas.remove(alerta_id)
+            
+            # Debug: mostrar todas las distancias cada 10 lecturas
+            if hasattr(self, 'debug_counter'):
+                self.debug_counter += 1
             else:
-                # Remover alerta si ya no está cerca
-                alerta_id = f"distancia_critica_{dist.id}"
-                if alerta_id in self.alertas_activas:
-                    self.alertas_activas.remove(alerta_id)
+                self.debug_counter = 1
+                
+            if self.debug_counter % 50 == 0:  # Cada 50 lecturas (aprox cada 100 segundos)
+                print(f"📊 DEBUG DISTANCIAS: {dist.id}={dist.distancia_cm:.1f}cm", end=" ")
+                if dist.id == 'P6':  # Último sensor, nueva línea
+                    print()
     
     def _process_gas(self, data: ArduinoDataParser):
-        """Procesa información de sensores de gas con histéresis."""
+        """Procesa información de sensores de gas con histéresis y debug."""
+        # Debug periódico de valores de gas
+        if not hasattr(self, 'gas_debug_counter'):
+            self.gas_debug_counter = 0
+        self.gas_debug_counter += 1
+        
+        if self.gas_debug_counter % 30 == 0:  # Cada 30 lecturas
+            valores_gas = [f"{gas.zona}={gas.ppm}ppm" for gas in data.gas]
+            print(f"🔥 VALORES GAS: {', '.join(valores_gas)}")
+        
         for gas in data.gas:
             alerta_id = f"gas_alto_{gas.zona}"
             
-            # Histéresis: umbral alto para activar, umbral bajo para desactivar
-            umbral_activacion = 260  # Mayor que el umbral normal (250)
-            umbral_desactivacion = 240  # Menor que el umbral normal
+            # Histéresis mejorada: solo alertar por humo real, no fluctuaciones normales
+            umbral_activacion = 275  # Solo si realmente hay humo (Arduino HUMO_UMBRAL=500 → ~275ppm)
+            umbral_desactivacion = 250  # Volver a valores normales
             
             if alerta_id not in self.alertas_activas:
-                # Solo activar si supera el umbral de activación
+                # Solo activar si supera el umbral de activación (humo detectado)
                 if gas.ppm >= umbral_activacion:
-                    print(f"ALERTA: Gas alto en zona {gas.zona} ({gas.ppm} ppm)")
+                    print(f"🔥 HUMO DETECTADO: Zona {gas.zona} ({gas.ppm} ppm)")
                     self.alertas_activas.add(alerta_id)
             else:
                 # Solo desactivar si baja del umbral de desactivación
                 if gas.ppm < umbral_desactivacion:
-                    print(f"INFO: Gas normalizado en zona {gas.zona} ({gas.ppm} ppm)")
+                    print(f"✅ HUMO ELIMINADO: Zona {gas.zona} ({gas.ppm} ppm)")
                     self.alertas_activas.remove(alerta_id)
     
     def _process_sismo(self, data: ArduinoDataParser):

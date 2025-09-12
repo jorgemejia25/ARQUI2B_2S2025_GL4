@@ -54,6 +54,9 @@ class ArduinoSimulator:
         
         # ETA activos
         self.active_eta = {}
+        
+        # Control manual de alertas
+        self.manual_alert_duration = 5.0  # Duración de alertas manuales en segundos
     
     def generate_timestamp(self) -> str:
         """Genera un timestamp simulado."""
@@ -117,67 +120,37 @@ class ArduinoSimulator:
         """Genera datos de sensores de gas simulados."""
         gas_data = {}
 
-        # Ambos sensores usan el mismo mapeo que Arduino: analogRead(0-1023) -> ppm(150-300)
-        # Zona 1 - simula diferentes niveles de gas
-        if random.random() < 0.15:  # 15% de probabilidad de gas alto
-            gas_data['Z1'] = random.randint(250, 300)
+        # Verificar si hay alerta manual de gas activa
+        if hasattr(self, 'manual_gas_alert') and self.simulation_time < self.manual_gas_alert['until']:
+            # Usar valores de alerta manual
+            gas_data[self.manual_gas_alert['zone']] = self.manual_gas_alert['ppm']
+            # Generar valor normal para la otra zona
+            other_zone = 'Z2' if self.manual_gas_alert['zone'] == 'Z1' else 'Z1'
+            gas_data[other_zone] = random.randint(150, 249)
         else:
+            # Valores normales (sin alertas automáticas)
             gas_data['Z1'] = random.randint(150, 249)
-
-        # Zona 2 - simula diferentes niveles de gas
-        if random.random() < 0.10:  # 10% de probabilidad de gas alto
-            gas_data['Z2'] = random.randint(250, 300)
-        else:
             gas_data['Z2'] = random.randint(150, 249)
 
         return gas_data
     
     def update_earthquake_simulation(self):
         """Actualiza la simulación del sismo."""
-        # 5% de probabilidad de activar sismo
-        if not self.earthquake_state['active'] and random.random() < 0.05:
-            self.earthquake_state['active'] = True
-            self.earthquake_state['until'] = self.simulation_time + random.uniform(3.0, 8.0)
-            self.earthquake_state['magnitude'] = random.uniform(4.5, 6.5)
-        
-        # Desactivar sismo si ya pasó el tiempo
-        if self.earthquake_state['active'] and self.simulation_time >= self.earthquake_state['until']:
-            self.earthquake_state['active'] = False
-            self.earthquake_state['magnitude'] = 0.0
+        # DESACTIVADO: No generar sismos automáticamente en modo simulación
+        # Los sismos se activarán manualmente con teclas
+        pass
     
     def update_panic_buttons_simulation(self):
         """Actualiza la simulación de botones de pánico."""
-        for btn_id in self.panic_button_states:
-            btn = self.panic_button_states[btn_id]
-            
-            # 2% de probabilidad de activar botón
-            if not btn['active'] and random.random() < 0.02:
-                btn['active'] = True
-                btn['until'] = self.simulation_time + random.uniform(2.0, 4.0)
-            
-            # Desactivar botón si ya pasó el tiempo
-            if btn['active'] and self.simulation_time >= btn['until']:
-                btn['active'] = False
+        # DESACTIVADO: No generar botones de pánico automáticamente en modo simulación
+        # Los botones se activarán manualmente con teclas
+        pass
     
     def update_violations_simulation(self):
         """Actualiza la simulación de infracciones."""
-        # Limpiar infracciones antiguas
-        self.active_violations.clear()
-
-        # Simular infracciones solo cuando hay semáforos en rojo (como Arduino real)
-        red_semaphores = []
-        for i in range(1, 11):
-            sem_id = f"S{i}"
-            if self.get_traffic_light_state(sem_id) == "ROJO":
-                red_semaphores.append(sem_id)
-
-        # Si hay semáforos en rojo, 10% de probabilidad de infracción
-        if red_semaphores and random.random() < 0.10:
-            # Generar 1-2 infracciones en semáforos rojos
-            num_violations = random.randint(1, 2)
-            for _ in range(num_violations):
-                semaphore = random.choice(red_semaphores)
-                self.active_violations.add(semaphore)
+        # DESACTIVADO: No generar infracciones automáticamente en modo simulación
+        # Las infracciones se activarán manualmente con teclas
+        pass
     
     def update_eta_simulation(self):
         """Actualiza la simulación de ETA."""
@@ -248,6 +221,46 @@ class ArduinoSimulator:
             }
         
         return json.dumps(data, ensure_ascii=False)
+    
+    def activate_earthquake_alert(self, magnitude: float = 5.5):
+        """Activa manualmente una alerta de sismo."""
+        self.earthquake_state['active'] = True
+        self.earthquake_state['until'] = self.simulation_time + self.manual_alert_duration
+        self.earthquake_state['magnitude'] = magnitude
+        print(f"🌍 SISMO ACTIVADO MANUALMENTE - Magnitud: {magnitude}")
+    
+    def activate_panic_button_alert(self, button_id: str = "PB1"):
+        """Activa manualmente un botón de pánico."""
+        if button_id in self.panic_button_states:
+            self.panic_button_states[button_id]['active'] = True
+            self.panic_button_states[button_id]['until'] = self.simulation_time + self.manual_alert_duration
+            print(f"🚨 BOTÓN DE PÁNICO ACTIVADO - {button_id}")
+    
+    def activate_violation_alert(self, semaphore_id: str = "S1"):
+        """Activa manualmente una infracción de tráfico."""
+        self.active_violations.add(semaphore_id)
+        print(f"🚗 INFRACCIÓN ACTIVADA - Semáforo: {semaphore_id}")
+    
+    def activate_gas_alert(self, zone: str = "Z1", ppm: int = 280):
+        """Activa manualmente una alerta de gas alto."""
+        # Esta función se usará para modificar los valores de gas en la próxima generación
+        self.manual_gas_alert = {"zone": zone, "ppm": ppm, "until": self.simulation_time + self.manual_alert_duration}
+        print(f"🔥 ALERTA DE GAS ACTIVADA - Zona: {zone}, PPM: {ppm}")
+    
+    def clear_all_alerts(self):
+        """Limpia todas las alertas activas."""
+        self.earthquake_state['active'] = False
+        self.earthquake_state['magnitude'] = 0.0
+        
+        for btn_id in self.panic_button_states:
+            self.panic_button_states[btn_id]['active'] = False
+        
+        self.active_violations.clear()
+        
+        if hasattr(self, 'manual_gas_alert'):
+            delattr(self, 'manual_gas_alert')
+        
+        print("🧹 TODAS LAS ALERTAS LIMPIADAS")
     
     def simulate_data_stream(self, interval: float = 2.0, duration: float = 60.0):
         """

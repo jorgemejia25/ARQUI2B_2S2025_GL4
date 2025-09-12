@@ -19,6 +19,7 @@ from serial_receiver import ArduinoSerialReceiver, SerialConfig
 from arduino_data_parser import ArduinoDataParser, parse_arduino_json
 from config import SERIAL_CONFIG
 from simulation_mode import ArduinoSimulator
+from keyboard_alert_controller import KeyboardAlertController
 
 # Configuración MQTT
 import os
@@ -44,6 +45,7 @@ class ArduinoMainController:
     def __init__(self, simulation_mode: bool = False):
         self.receiver: ArduinoSerialReceiver = None
         self.simulator: ArduinoSimulator = None
+        self.keyboard_controller: KeyboardAlertController = None
         self.data_count = 0
         self.last_data: ArduinoDataParser = None
         self.alertas_activas = set()
@@ -139,6 +141,48 @@ class ArduinoMainController:
         except Exception as e:
             print(f"Error al publicar en MQTT: {e}")
     
+    def _publish_individual_infraction(self, infraccion: str):
+        """Publica una infracción individual en el tópico MQTT específico para alertas."""
+        print(f"🔄 Iniciando publicación de infracción: {infraccion}")
+        
+        if not self.mqtt_connected:
+            print(f"⚠️ MQTT no conectado - infracción {infraccion} no publicada")
+            return
+        
+        try:
+            # Crear datos de infracción para MQTT
+            infraction_data = {
+                "timestamp": time.time(),
+                "alert_type": "INFRACCION",
+                "sensor_id": "SIMULATED",  # En modo simulación no tenemos sensor específico
+                "semaforo_id": infraccion,  # El ID del semáforo (ej: "S1", "S5", etc.)
+                "distancia_cm": 5.0,  # Distancia simulada muy cerca (infracción)
+                "severity": 4,  # Alta severidad
+                "signal_color": "red",  # Asumimos que es infracción de luz roja
+                "violation_type": "red_light",
+                "origen": f"Simulación - Infracción semáforo {infraccion}"
+            }
+            
+            # Publicar en el tópico específico de infracciones
+            infraction_topic = MQTT_TOPIC + "/infracciones"
+            message = json.dumps(infraction_data, indent=2)
+            
+            print(f"📤 Publicando en tópico: {infraction_topic}")
+            print(f"📄 Datos: {json.dumps(infraction_data, indent=2)}")
+            
+            result = self.mqtt_client.publish(infraction_topic, message)
+            
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                print(f"✅ INFRACCIÓN PUBLICADA EN MQTT: {infraccion} → {infraction_topic}")
+                print(f"🎯 Debería llegar a la API y luego al WebSocket /ws/alerts")
+            else:
+                print(f"❌ Error al publicar infracción {infraccion}: {result.rc}")
+                
+        except Exception as e:
+            print(f"❌ Error al publicar infracción individual {infraccion}: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def _convert_to_mqtt_format(self, data: ArduinoDataParser) -> dict:
         """Convierte los datos del Arduino al formato MQTT."""
         return {
@@ -200,8 +244,14 @@ class ArduinoMainController:
             # Crear simulador
             self.simulator = ArduinoSimulator()
             
-            # Configurar callbacks para datos simulados
-            print("Simulador configurado")
+            # Crear controlador de teclas
+            self.keyboard_controller = KeyboardAlertController(self.simulator)
+            
+            # Configurar callbacks del controlador de teclas
+            self.keyboard_controller.set_alert_callback(self._on_keyboard_alert)
+            self.keyboard_controller.set_quit_callback(self._on_keyboard_quit)
+            
+            print("Simulador y controlador de teclas configurados")
             print("Inicialización completada")
         else:
             print("=== Módulo MQTT - Comunicación Serial con Arduino ===")
@@ -230,9 +280,14 @@ class ArduinoMainController:
         """Inicia la comunicación con Arduino o simulación."""
         if self.simulation_mode:
             print("\nIniciando modo simulación...")
+            
+            # Iniciar controlador de teclas
+            if self.keyboard_controller:
+                self.keyboard_controller.start()
+            
             self.running = True
             print("Simulación iniciada - Generando datos...")
-            print("Presiona Ctrl+C para detener")
+            print("Presiona Ctrl+C o 'Q' para detener")
             return True
         else:
             if not self.receiver:
@@ -262,6 +317,11 @@ class ArduinoMainController:
         if self.simulation_mode:
             if self.running:
                 print("\nDeteniendo simulación...")
+                
+                # Detener controlador de teclas
+                if self.keyboard_controller:
+                    self.keyboard_controller.stop()
+                
                 self.running = False
                 print("Simulación detenida")
         else:
@@ -279,6 +339,15 @@ class ArduinoMainController:
             self.mqtt_client.disconnect()
             self.mqtt_connected = False
             print("Cliente MQTT detenido")
+    
+    def _on_keyboard_alert(self, alert_type: str, details: str):
+        """Callback ejecutado cuando se activa una alerta por teclado."""
+        print(f"\n🎮 ALERTA ACTIVADA POR TECLADO: {alert_type} - {details}")
+    
+    def _on_keyboard_quit(self):
+        """Callback ejecutado cuando se presiona 'q' para salir."""
+        print("\n🛑 Salida solicitada por teclado")
+        self.stop()
     
     def run(self):
         """Bucle principal de ejecución."""
@@ -394,27 +463,31 @@ class ArduinoMainController:
         print(f"   Distancia: {distancia}cm")
         print(f"   Timestamp: {datetime.now().strftime('%H:%M:%S')}")
         
-        # Crear datos simulados para MQTT
+        # Crear datos de infracción en tiempo real para MQTT
         infraction_data = {
             "timestamp": time.time(),
             "alert_type": "INFRACCION",
             "sensor_id": f"SD{sd_num}",
             "semaforo_id": semaforo_id,
             "distancia_cm": distancia,
-            "severity": 3  # Alta severidad
+            "severity": 4,  # Alta severidad
+            "signal_color": "red",  # Asumimos que es infracción de luz roja
+            "violation_type": "red_light",
+            "origen": f"Sensor SD{sd_num} - Infracción semáforo {semaforo_id}"
         }
         
-        # Publicar infracción inmediatamente por MQTT
+        # Publicar infracción inmediatamente por MQTT usando el método unificado
         if self.mqtt_connected:
             try:
+                infraction_topic = MQTT_TOPIC + "/infracciones"
                 message = json.dumps(infraction_data, indent=2)
-                result = self.mqtt_client.publish(MQTT_TOPIC + "/infracciones", message)
+                result = self.mqtt_client.publish(infraction_topic, message)
                 if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                    print(f"   ✓ Infracción publicada en MQTT")
+                    print(f"   ✅ Infracción en tiempo real publicada en MQTT: {semaforo_id}")
                 else:
-                    print(f"   ✗ Error publicando infracción: {result.rc}")
+                    print(f"   ❌ Error publicando infracción: {result.rc}")
             except Exception as e:
-                print(f"   ✗ Error en MQTT infracción: {e}")
+                print(f"   ❌ Error en MQTT infracción: {e}")
         else:
             print(f"   ⚠️ MQTT no conectado - infracción no publicada")
     
@@ -545,9 +618,14 @@ class ArduinoMainController:
         if data.tiene_infracciones:
             alerta_id = "infracciones_activas"
             if alerta_id not in self.alertas_activas:
-                print(f"ALERTA: {len(data.infracciones)} infracciones activas")
+                print(f"🚨 ALERTA: {len(data.infracciones)} infracciones activas")
                 for infraccion in data.infracciones:
                     print(f"   - {infraccion}")
+                    print(f"   📡 Publicando infracción individual: {infraccion}")
+                    
+                    # Enviar cada infracción individualmente por MQTT para que llegue al WebSocket
+                    self._publish_individual_infraction(infraccion)
+                
                 self.alertas_activas.add(alerta_id)
         else:
             # Remover alerta si ya no hay infracciones

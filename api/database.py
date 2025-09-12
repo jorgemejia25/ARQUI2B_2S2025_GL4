@@ -121,7 +121,15 @@ class DatabaseManager:
                         INSERT INTO Alert (ts, alert_type_id, severity, bus_id, stop_id) 
                         VALUES (datetime('now'), ?, ?, ?, ?)
                         """
-                        severity = infraccion.get("severity", 3)
+                        # Manejar tanto strings ("S1") como diccionarios
+                        if isinstance(infraccion, dict):
+                            severity = infraccion.get("severity", 3)
+                            signal_id = infraccion.get("signal_id", str(infraccion))
+                        else:
+                            # Es un string como "S1"
+                            severity = 3  # Severidad por defecto
+                            signal_id = str(infraccion)
+                        
                         result = self.execute_query(alert_query, (alert_type_id, severity, None, None))
                         
                         if result is not None:
@@ -137,9 +145,14 @@ class DatabaseManager:
                                 INSERT INTO TrafficInfraction (alert_id, signal_color) 
                                 VALUES (?, ?)
                                 """
-                                signal_color = infraccion.get("signal_color", "red")
+                                # Usar signal_color de la infracción o por defecto "red"
+                                if isinstance(infraccion, dict):
+                                    signal_color = infraccion.get("signal_color", "red")
+                                else:
+                                    signal_color = "red"  # Por defecto para strings como "S1"
+                                
                                 self.execute_query(infraction_query, (alert_id, signal_color))
-                                logger.info(f"Infracción de tráfico guardada: {signal_color}")
+                                logger.info(f"Infracción de tráfico guardada: {signal_id} - {signal_color}")
                                 saved_something = True
             
             # Procesar botones de pánico activos

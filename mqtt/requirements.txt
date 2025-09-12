@@ -10,6 +10,9 @@ python-dotenv>=1.0.0
 # Biblioteca para comunicación MQTT
 paho-mqtt>=1.6.0
 
+# Biblioteca para detección de teclas (solo para modo simulación)
+pynput>=1.8.0
+
 # Para desarrollo y testing (opcional)
 # pytest>=7.0.0
 # pytest-cov>=4.0.0

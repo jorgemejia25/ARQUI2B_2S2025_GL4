@@ -80,11 +80,13 @@ inline void buzzPin(uint8_t pin)
   {
     digitalWrite(BUZ_TU1_PIN, HIGH);
     buz1Until = now + 2000;
+    digitalWrite(Modificar_BUZ1TESTCALI, HIGH);
   }
   else if (pin == BUZ_TU2_PIN)
   {
     digitalWrite(BUZ_TU2_PIN, HIGH);
     buz2Until = now + 2000;
+    digitalWrite(Modificar_BUZ2TESTCALI, HIGH);
   }
   else if (pin == BUZ3_PIN)
   {
@@ -101,11 +103,13 @@ void updateBuzzers()
   if (buz1Until && now >= buz1Until)
   {
     digitalWrite(BUZ_TU1_PIN, LOW);
+    digitalWrite(Modificar_BUZ1TESTCALI, LOW);
     buz1Until = 0;
   }
   if (buz2Until && now >= buz2Until)
   {
     digitalWrite(BUZ_TU2_PIN, LOW);
+    digitalWrite(Modificar_BUZ2TESTCALI, LOW);
     buz2Until = 0;
   }
 }
@@ -350,6 +354,8 @@ inline bool isGroupRed(uint8_t g)
 uint8_t sdConsec[5] = {0, 0, 0, 0, 0};
 bool sdAlerted[5] = {false, false, false, false, false};
 
+
+// Cambia solamente flutter para que los semaforos del svg solo sean SD y SI en el SVG. Que se enciendan por grupos solamente. Esto en el mapa. Para no complicarnos y que se enciendan agrupados
 // Mapeo por dirección
 const uint8_t SD_TO_S_DIR21[5] = {1, 3, 5, 7, 9};  // TU 2→1
 const uint8_t SD_TO_S_DIR12[5] = {10, 3, 4, 7, 9}; // TU 1→2

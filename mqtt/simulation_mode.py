@@ -137,19 +137,16 @@ class ArduinoSimulator:
     def update_earthquake_simulation(self):
         """Actualiza la simulación del sismo."""
         # DESACTIVADO: No generar sismos automáticamente en modo simulación
-        # Los sismos se activarán manualmente con teclas
         pass
     
     def update_panic_buttons_simulation(self):
         """Actualiza la simulación de botones de pánico."""
         # DESACTIVADO: No generar botones de pánico automáticamente en modo simulación
-        # Los botones se activarán manualmente con teclas
         pass
     
     def update_violations_simulation(self):
         """Actualiza la simulación de infracciones."""
         # DESACTIVADO: No generar infracciones automáticamente en modo simulación
-        # Las infracciones se activarán manualmente con teclas
         pass
     
     def update_eta_simulation(self):

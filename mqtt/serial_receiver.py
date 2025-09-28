@@ -263,7 +263,7 @@ class ArduinoSerialReceiver:
             match = re.match(r'INFRACCION ROJO SD(\d+) -> Semaforo S(\d+), cm=([0-9.]+)', line)
             if match:
                 sd_num = int(match.group(1))
-                semaforo_id = match.group(2)
+                semaforo_id = f"S{match.group(2)}"  # Agregar "S" al número para formato correcto
                 distancia = float(match.group(3))
                 
                 self.logger.warning(f"🚨 INFRACCIÓN DETECTADA: SD{sd_num} -> S{semaforo_id} ({distancia}cm)")

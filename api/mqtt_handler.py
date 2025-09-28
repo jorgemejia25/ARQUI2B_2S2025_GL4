@@ -69,11 +69,10 @@ class MQTTHandler:
             
             # Log específico para infracciones
             if topic == "arduino/data/infracciones":
-                logger.error("🚨🚨🚨 INFRACCIÓN RECIBIDA EN API 🚨🚨🚨")
+                logger.error(" INFRACCIÓN RECIBIDA EN API ")
                 logger.error(f"DATOS DE INFRACCIÓN: {payload}")
-                print("\n🚨🚨🚨 INFRACCIÓN MQTT RECIBIDA EN API! 🚨🚨🚨")
+                print("\n INFRACCIÓN MQTT RECIBIDA EN API! ")
                 print(f"Datos: {payload}")
-                print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
             
             # Guardar en la base de datos
             try:
@@ -187,7 +186,7 @@ class MQTTHandler:
             
             if topic == "arduino/data/infracciones":
                 # Procesar infracción en tiempo real
-                logger.info(f"🚨 INFRACCIÓN EN TIEMPO REAL RECIBIDA: {payload}")
+                logger.info(f"INFRACCIÓN EN TIEMPO REAL RECIBIDA: {payload}")
                 await self._process_realtime_infraction(payload)
                 return
                 
@@ -319,7 +318,7 @@ class MQTTHandler:
                     # Procesar datos de ETA (tiempos de llegada de buses)
                     if "eta" in payload and payload["eta"]:
                         eta_data = payload["eta"]
-                        logger.info(f"🚌 DATOS ETA RECIBIDOS: {eta_data}")
+                        logger.info(f"DATOS ETA RECIBIDOS: {eta_data}")
                         logger.info(f"Procesando {len(eta_data)} ETAs de transporte...")
                         
                         # Definir categorías de paradas correctas (según mapeo del Arduino)
@@ -457,9 +456,9 @@ class MQTTHandler:
                     
                     # Debug: mostrar si hay campo infracciones
                     if "infracciones" in payload:
-                        logger.info(f"🚨 CAMPO INFRACCIONES ENCONTRADO: {payload['infracciones']}")
+                        logger.info(f"CAMPO INFRACCIONES ENCONTRADO: {payload['infracciones']}")
                     else:
-                        logger.info("ℹ️ No se encontró campo 'infracciones' en payload")
+                        logger.info("ℹNo se encontró campo 'infracciones' en payload")
                     
                     # Procesar infracciones
                     if "infracciones" in payload and len(payload["infracciones"]) > 0:
@@ -513,7 +512,7 @@ class MQTTHandler:
                                     "severity": 4
                                 }
                             }
-                            logger.info(f"🚨 Enviando infracción por WebSocket: {signal_id} - {signal_color}")
+                            logger.info(f"Enviando infracción por WebSocket: {signal_id} - {signal_color}")
                             await self.websocket_manager.emit_alert(alert_data)
 
                         logger.info("Procesadas todas las infracciones.")

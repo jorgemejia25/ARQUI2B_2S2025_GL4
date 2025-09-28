@@ -19,7 +19,7 @@ from serial_receiver import ArduinoSerialReceiver, SerialConfig
 from arduino_data_parser import ArduinoDataParser, parse_arduino_json
 from config import SERIAL_CONFIG
 from simulation_mode import ArduinoSimulator
-from keyboard_alert_controller import KeyboardAlertController
+
 
 # Configuración MQTT
 import os
@@ -45,7 +45,6 @@ class ArduinoMainController:
     def __init__(self, simulation_mode: bool = False):
         self.receiver: ArduinoSerialReceiver = None
         self.simulator: ArduinoSimulator = None
-        self.keyboard_controller: KeyboardAlertController = None
         self.data_count = 0
         self.last_data: ArduinoDataParser = None
         self.alertas_activas = set()
@@ -244,14 +243,7 @@ class ArduinoMainController:
             # Crear simulador
             self.simulator = ArduinoSimulator()
             
-            # Crear controlador de teclas
-            self.keyboard_controller = KeyboardAlertController(self.simulator)
-            
-            # Configurar callbacks del controlador de teclas
-            self.keyboard_controller.set_alert_callback(self._on_keyboard_alert)
-            self.keyboard_controller.set_quit_callback(self._on_keyboard_quit)
-            
-            print("Simulador y controlador de teclas configurados")
+            print("Simulador configurado")
             print("Inicialización completada")
         else:
             print("=== Módulo MQTT - Comunicación Serial con Arduino ===")
@@ -280,10 +272,6 @@ class ArduinoMainController:
         """Inicia la comunicación con Arduino o simulación."""
         if self.simulation_mode:
             print("\nIniciando modo simulación...")
-            
-            # Iniciar controlador de teclas
-            if self.keyboard_controller:
-                self.keyboard_controller.start()
             
             self.running = True
             print("Simulación iniciada - Generando datos...")
@@ -318,10 +306,6 @@ class ArduinoMainController:
             if self.running:
                 print("\nDeteniendo simulación...")
                 
-                # Detener controlador de teclas
-                if self.keyboard_controller:
-                    self.keyboard_controller.stop()
-                
                 self.running = False
                 print("Simulación detenida")
         else:
@@ -340,15 +324,7 @@ class ArduinoMainController:
             self.mqtt_connected = False
             print("Cliente MQTT detenido")
     
-    def _on_keyboard_alert(self, alert_type: str, details: str):
-        """Callback ejecutado cuando se activa una alerta por teclado."""
-        print(f"\n🎮 ALERTA ACTIVADA POR TECLADO: {alert_type} - {details}")
-    
-    def _on_keyboard_quit(self):
-        """Callback ejecutado cuando se presiona 'q' para salir."""
-        print("\n🛑 Salida solicitada por teclado")
-        self.stop()
-    
+
     def run(self):
         """Bucle principal de ejecución."""
         if not self.start():
@@ -468,7 +444,7 @@ class ArduinoMainController:
             "timestamp": time.time(),
             "alert_type": "INFRACCION",
             "sensor_id": f"SD{sd_num}",
-            "semaforo_id": semaforo_id,
+            "semaforo_id": semaforo_id,  # Ya viene con formato "S3", "S7", etc.
             "distancia_cm": distancia,
             "severity": 4,  # Alta severidad
             "signal_color": "red",  # Asumimos que es infracción de luz roja

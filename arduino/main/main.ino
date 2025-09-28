@@ -80,11 +80,13 @@ inline void buzzPin(uint8_t pin)
   {
     digitalWrite(BUZ_TU1_PIN, HIGH);
     buz1Until = now + 2000;
+    digitalWrite(Modificar_BUZ1TESTCALI, HIGH);
   }
   else if (pin == BUZ_TU2_PIN)
   {
     digitalWrite(BUZ_TU2_PIN, HIGH);
     buz2Until = now + 2000;
+    digitalWrite(Modificar_BUZ2TESTCALI, HIGH);
   }
   else if (pin == BUZ3_PIN)
   {
@@ -101,11 +103,13 @@ void updateBuzzers()
   if (buz1Until && now >= buz1Until)
   {
     digitalWrite(BUZ_TU1_PIN, LOW);
+    digitalWrite(Modificar_BUZ1TESTCALI, LOW);
     buz1Until = 0;
   }
   if (buz2Until && now >= buz2Until)
   {
     digitalWrite(BUZ_TU2_PIN, LOW);
+    digitalWrite(Modificar_BUZ2TESTCALI, LOW);
     buz2Until = 0;
   }
 }
@@ -350,6 +354,8 @@ inline bool isGroupRed(uint8_t g)
 uint8_t sdConsec[5] = {0, 0, 0, 0, 0};
 bool sdAlerted[5] = {false, false, false, false, false};
 
+
+// Cambia solamente flutter para que los semaforos del svg solo sean SD y SI en el SVG. Que se enciendan por grupos solamente. Esto en el mapa. Para no complicarnos y que se enciendan agrupados
 // Mapeo por dirección
 const uint8_t SD_TO_S_DIR21[5] = {1, 3, 5, 7, 9};  // TU 2→1
 const uint8_t SD_TO_S_DIR12[5] = {10, 3, 4, 7, 9}; // TU 1→2
@@ -518,8 +524,23 @@ void emitStatusJson()
   }
   Serial.print("},");
 
-  int gas1 = map(constrain(analogRead(PIN_AO), 0, 1023), 0, 1023, 150, 300);
-  int gas2 = map(constrain(analogRead(PIN_A1), 0, 1023), 0, 1023, 150, 300);
+  // Leer valores analógicos para detectar humo real
+  int analog1 = analogRead(PIN_AO);
+  int analog2 = analogRead(PIN_A1);
+
+  // Valores base normales (sin humo)
+  int gas1 = 200; // Valor normal base
+  int gas2 = 200; // Valor normal base
+
+  // Solo reportar valores altos si realmente hay humo
+  if (analog1 >= HUMO_UMBRAL)
+  {
+    gas1 = map(analog1, HUMO_UMBRAL, 1023, 280, 350);
+  }
+  if (analog2 >= HUMO_UMBRAL)
+  {
+    gas2 = map(analog2, HUMO_UMBRAL, 1023, 280, 350);
+  }
   Serial.print("\"gas_ppm\":{\"Z1\":");
   Serial.print(gas1);
   Serial.print(",\"Z2\":");
@@ -614,12 +635,6 @@ void emitStatusJson()
     Serial.print("\"P2\":\"TU,ETA_S=90,FROM=Zona1,TO=P2\"");
     etaFirst = false;
   }
-
-  // ETA para paradas adicionales (P5, P6) - simulados
-  if (!etaFirst)
-    Serial.print(',');
-  Serial.print("\"P5\":\"TU,ETA_S=120,FROM=Zona2,TO=P5\",");
-  Serial.print("\"P6\":\"M,ETA_S=180,FROM=Estacion3,TO=P6\"");
 
   Serial.print("},");
 

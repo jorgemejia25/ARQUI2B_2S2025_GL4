@@ -9,7 +9,7 @@ SERIAL_CONFIG = {
 
     
     # Velocidad de transmisión (debe coincidir con Arduino)
-    'baudrate': 9600,
+    'baudrate': 115200,
     
     # Timeout para operaciones de lectura
     'timeout': 1.0,

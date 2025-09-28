@@ -67,6 +67,13 @@ class MQTTHandler:
             logger.info(f"Payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
             logger.info("==========================")
             
+            # Log específico para infracciones
+            if topic == "arduino/data/infracciones":
+                logger.error(" INFRACCIÓN RECIBIDA EN API ")
+                logger.error(f"DATOS DE INFRACCIÓN: {payload}")
+                print("\n INFRACCIÓN MQTT RECIBIDA EN API! ")
+                print(f"Datos: {payload}")
+            
             # Guardar en la base de datos
             try:
                 success = self.db_manager.save_mqtt_data(topic, payload)
@@ -177,7 +184,13 @@ class MQTTHandler:
                 logger.error(f"Payload no es un diccionario: {type(payload)} - {payload}")
                 return
             
-            if topic == "arduino/data":
+            if topic == "arduino/data/infracciones":
+                # Procesar infracción en tiempo real
+                logger.info(f"INFRACCIÓN EN TIEMPO REAL RECIBIDA: {payload}")
+                await self._process_realtime_infraction(payload)
+                return
+                
+            elif topic == "arduino/data":
                 # Procesar datos del Arduino
                 if "alert_type" in payload:
                     logger.info(f"Procesando alerta tipo: {payload['alert_type']}")
@@ -227,7 +240,7 @@ class MQTTHandler:
                 elif "gas_ppm" in payload:
                     logger.info(f"Procesando medición de gas: {payload['gas_ppm']} ppm")
                     # Alerta de gas (si supera umbral)
-                    threshold = payload.get("threshold_ppm", 100.0)
+                    threshold = payload.get("threshold_ppm", 275.0)
                     if payload["gas_ppm"] > threshold:
                         logger.info(f"Gas supera umbral ({threshold} ppm), emitiendo alerta...")
                         alert_data = {
@@ -305,11 +318,12 @@ class MQTTHandler:
                     # Procesar datos de ETA (tiempos de llegada de buses)
                     if "eta" in payload and payload["eta"]:
                         eta_data = payload["eta"]
+                        logger.info(f"DATOS ETA RECIBIDOS: {eta_data}")
                         logger.info(f"Procesando {len(eta_data)} ETAs de transporte...")
                         
-                        # Definir categorías de paradas correctas
-                        PARADAS_TRANSMETRO = ["P1", "P2"]
-                        PARADAS_TRANSURBANO = ["P3", "P4"]
+                        # Definir categorías de paradas correctas (según mapeo del Arduino)
+                        PARADAS_TRANSMETRO = ["P3", "P4"]  # TM1, TM2
+                        PARADAS_TRANSURBANO = ["P1", "P2"]  # TU3, TU4
                         
                         # El Arduino envía eta como array de objetos con información completa
                         for eta_item in eta_data:
@@ -404,7 +418,7 @@ class MQTTHandler:
                             is_alto = gas_measurement.get("is_alto", False)
                             zona = gas_measurement.get("zona", "unknown")
                             
-                            if is_alto or ppm > 100:  # Umbral de 100 ppm
+                            if is_alto or ppm > 275:  # Umbral de 275 ppm (solo humo real)
                                 logger.info(f"Gas alto detectado en {zona}: {ppm} ppm - emitiendo alerta")
                                 # Dentro de "Procesar mediciones de gas":
                                 alert_data = {
@@ -413,7 +427,7 @@ class MQTTHandler:
                                     "severity": 3,
                                     "data": {
                                         "gas_ppm": ppm,
-                                        "threshold_ppm": 100.0,
+                                        "threshold_ppm": 275.0,
                                         "zona": zona,
                                         "origen": zona,         
                                         "is_alto": is_alto
@@ -439,6 +453,12 @@ class MQTTHandler:
                         }
                         await self.websocket_manager.emit_alert(alert_data)
                         logger.info("Alerta sísmica emitida exitosamente")
+                    
+                    # Debug: mostrar si hay campo infracciones
+                    if "infracciones" in payload:
+                        logger.info(f"CAMPO INFRACCIONES ENCONTRADO: {payload['infracciones']}")
+                    else:
+                        logger.info("ℹNo se encontró campo 'infracciones' en payload")
                     
                     # Procesar infracciones
                     if "infracciones" in payload and len(payload["infracciones"]) > 0:
@@ -478,12 +498,21 @@ class MQTTHandler:
 
                             # WS: /ws/alerts (para feed unificado de alertas)
                             alert_data = {
+                                "type": "infraction",  # Tipo que reconoce Flutter
                                 "timestamp": time.time(),
                                 "alert_type": "INFRACCION",
-                                "severity": 5,
+                                "severity": 4,  # Alta severidad
                                 "signal_id": signal_id,
                                 "signal_color": signal_color,
+                                "origen": f"Infracción semáforo {signal_id}",
+                                "data": {
+                                    "alert_type": "INFRACCION",
+                                    "signal_id": signal_id,
+                                    "signal_color": signal_color,
+                                    "severity": 4
+                                }
                             }
+                            logger.info(f"Enviando infracción por WebSocket: {signal_id} - {signal_color}")
                             await self.websocket_manager.emit_alert(alert_data)
 
                         logger.info("Procesadas todas las infracciones.")
@@ -497,6 +526,48 @@ class MQTTHandler:
         except Exception as e:
             logger.error(f"Error emitiendo datos por WebSocket: {e}")
             logger.error("=== ERROR EN EMISIÓN WEBSOCKET ===")
+    
+    async def _process_realtime_infraction(self, payload: Dict[str, Any]):
+        """Procesar infracción recibida en tiempo real desde MQTT"""
+        try:
+            logger.info("🚨 Procesando infracción en tiempo real...")
+            
+            # Extraer datos de la infracción
+            sensor_id = payload.get("sensor_id", "unknown")
+            semaforo_id = payload.get("semaforo_id", "unknown")
+            distancia_cm = payload.get("distancia_cm", 0)
+            severity = payload.get("severity", 4)
+            
+            logger.info(f"   Sensor: {sensor_id}")
+            logger.info(f"   Semáforo: {semaforo_id}")
+            logger.info(f"   Distancia: {distancia_cm}cm")
+            
+            # Crear alerta para WebSocket
+            alert_data = {
+                "type": "infraction",  # Tipo que reconoce Flutter
+                "timestamp": time.time(),
+                "alert_type": "INFRACCION",
+                "severity": severity,
+                "signal_id": semaforo_id,
+                "signal_color": "red",  # Siempre rojo en infracciones
+                "origen": f"Infracción {sensor_id} → {semaforo_id}",
+                "data": {
+                    "alert_type": "INFRACCION",
+                    "signal_id": semaforo_id,
+                    "signal_color": "red",
+                    "sensor_id": sensor_id,
+                    "distancia_cm": distancia_cm,
+                    "severity": severity
+                }
+            }
+            
+            # Enviar por WebSocket inmediatamente
+            logger.info(f"🚨 Enviando infracción inmediata por WebSocket: {semaforo_id}")
+            await self.websocket_manager.emit_alert(alert_data)
+            logger.info("✅ Infracción enviada exitosamente por WebSocket")
+            
+        except Exception as e:
+            logger.error(f"Error procesando infracción en tiempo real: {e}")
     
     def get_database_stats(self) -> Dict[str, Any]:
         """Obtener estadísticas de la base de datos"""

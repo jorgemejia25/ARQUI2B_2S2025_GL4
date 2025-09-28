@@ -12,12 +12,14 @@ import argparse
 import json
 import paho.mqtt.client as mqtt
 from paho.mqtt.client import CallbackAPIVersion
+from datetime import datetime
 
 # Imports directos para ejecutar desde el directorio mqtt
 from serial_receiver import ArduinoSerialReceiver, SerialConfig
 from arduino_data_parser import ArduinoDataParser, parse_arduino_json
 from config import SERIAL_CONFIG
 from simulation_mode import ArduinoSimulator
+
 
 # Configuración MQTT
 import os
@@ -117,6 +119,7 @@ class ArduinoMainController:
     def _publish_mqtt(self, data: ArduinoDataParser):
         """Publica datos en el tópico MQTT."""
         if not self.mqtt_connected:
+            print("⚠️ MQTT no conectado - datos no publicados")
             return
         
         try:
@@ -128,12 +131,56 @@ class ArduinoMainController:
             result = self.mqtt_client.publish(MQTT_TOPIC, message)
             
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                print(f"✓ Datos publicados en MQTT - {data.timestamp}")
+                eta_count = len(data.eta)
+                gas_alerts = len([g for g in data.gas if g.ppm >= 260])
+                print(f"✓ MQTT publicado - {data.timestamp} | ETAs: {eta_count} | Gas alto: {gas_alerts}")
             else:
                 print(f"✗ Error al publicar MQTT (código: {result.rc})")
                 
         except Exception as e:
             print(f"Error al publicar en MQTT: {e}")
+    
+    def _publish_individual_infraction(self, infraccion: str):
+        """Publica una infracción individual en el tópico MQTT específico para alertas."""
+        print(f"🔄 Iniciando publicación de infracción: {infraccion}")
+        
+        if not self.mqtt_connected:
+            print(f"⚠️ MQTT no conectado - infracción {infraccion} no publicada")
+            return
+        
+        try:
+            # Crear datos de infracción para MQTT
+            infraction_data = {
+                "timestamp": time.time(),
+                "alert_type": "INFRACCION",
+                "sensor_id": "SIMULATED",  # En modo simulación no tenemos sensor específico
+                "semaforo_id": infraccion,  # El ID del semáforo (ej: "S1", "S5", etc.)
+                "distancia_cm": 5.0,  # Distancia simulada muy cerca (infracción)
+                "severity": 4,  # Alta severidad
+                "signal_color": "red",  # Asumimos que es infracción de luz roja
+                "violation_type": "red_light",
+                "origen": f"Simulación - Infracción semáforo {infraccion}"
+            }
+            
+            # Publicar en el tópico específico de infracciones
+            infraction_topic = MQTT_TOPIC + "/infracciones"
+            message = json.dumps(infraction_data, indent=2)
+            
+            print(f"📤 Publicando en tópico: {infraction_topic}")
+            print(f"📄 Datos: {json.dumps(infraction_data, indent=2)}")
+            
+            result = self.mqtt_client.publish(infraction_topic, message)
+            
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                print(f"✅ INFRACCIÓN PUBLICADA EN MQTT: {infraccion} → {infraction_topic}")
+                print(f"🎯 Debería llegar a la API y luego al WebSocket /ws/alerts")
+            else:
+                print(f"❌ Error al publicar infracción {infraccion}: {result.rc}")
+                
+        except Exception as e:
+            print(f"❌ Error al publicar infracción individual {infraccion}: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _convert_to_mqtt_format(self, data: ArduinoDataParser) -> dict:
         """Convierte los datos del Arduino al formato MQTT."""
@@ -196,7 +243,6 @@ class ArduinoMainController:
             # Crear simulador
             self.simulator = ArduinoSimulator()
             
-            # Configurar callbacks para datos simulados
             print("Simulador configurado")
             print("Inicialización completada")
         else:
@@ -217,6 +263,7 @@ class ArduinoMainController:
             # Configurar callbacks
             self.receiver.set_data_callback(self._on_data_received)
             self.receiver.set_error_callback(self._on_parse_error)
+            self.receiver.set_infraction_callback(self._on_infraction_detected)
             
             print("Callbacks configurados")
             print("Inicialización completada")
@@ -225,9 +272,10 @@ class ArduinoMainController:
         """Inicia la comunicación con Arduino o simulación."""
         if self.simulation_mode:
             print("\nIniciando modo simulación...")
+            
             self.running = True
             print("Simulación iniciada - Generando datos...")
-            print("Presiona Ctrl+C para detener")
+            print("Presiona Ctrl+C o 'Q' para detener")
             return True
         else:
             if not self.receiver:
@@ -257,6 +305,7 @@ class ArduinoMainController:
         if self.simulation_mode:
             if self.running:
                 print("\nDeteniendo simulación...")
+                
                 self.running = False
                 print("Simulación detenida")
         else:
@@ -275,6 +324,7 @@ class ArduinoMainController:
             self.mqtt_connected = False
             print("Cliente MQTT detenido")
     
+
     def run(self):
         """Bucle principal de ejecución."""
         if not self.start():
@@ -374,52 +424,141 @@ class ArduinoMainController:
         print(f"\nError de parsing: {error_msg}")
         print(f"Datos crudos: {raw_data[:100]}...")
     
+    def _on_infraction_detected(self, sd_num: int, semaforo_id: str, distancia: float):
+        """
+        Callback para infracciones detectadas en tiempo real.
+        
+        Args:
+            sd_num: Número del sensor SD (1-5)
+            semaforo_id: ID del semáforo infringido (S1-S10)
+            distancia: Distancia del vehículo en cm
+        """
+        print(f"\n🚨 INFRACCIÓN EN TIEMPO REAL:")
+        print(f"   Sensor: SD{sd_num}")
+        print(f"   Semáforo: {semaforo_id}")
+        print(f"   Distancia: {distancia}cm")
+        print(f"   Timestamp: {datetime.now().strftime('%H:%M:%S')}")
+        
+        # Crear datos de infracción en tiempo real para MQTT
+        infraction_data = {
+            "timestamp": time.time(),
+            "alert_type": "INFRACCION",
+            "sensor_id": f"SD{sd_num}",
+            "semaforo_id": semaforo_id,  # Ya viene con formato "S3", "S7", etc.
+            "distancia_cm": distancia,
+            "severity": 4,  # Alta severidad
+            "signal_color": "red",  # Asumimos que es infracción de luz roja
+            "violation_type": "red_light",
+            "origen": f"Sensor SD{sd_num} - Infracción semáforo {semaforo_id}"
+        }
+        
+        # Publicar infracción inmediatamente por MQTT usando el método unificado
+        if self.mqtt_connected:
+            try:
+                infraction_topic = MQTT_TOPIC + "/infracciones"
+                message = json.dumps(infraction_data, indent=2)
+                result = self.mqtt_client.publish(infraction_topic, message)
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                    print(f"   ✅ Infracción en tiempo real publicada en MQTT: {semaforo_id}")
+                else:
+                    print(f"   ❌ Error publicando infracción: {result.rc}")
+            except Exception as e:
+                print(f"   ❌ Error en MQTT infracción: {e}")
+        else:
+            print(f"   ⚠️ MQTT no conectado - infracción no publicada")
+    
     def _process_semaforos(self, data: ArduinoDataParser):
-        """Procesa información de semáforos."""
+        """Procesa información de semáforos con debug."""
         # Contar por estado
         verdes = len(data.semaforos_verdes)
         rojos = len(data.semaforos_rojos)
         amarillos = len(data.semaforos_amarillos)
         
+        # Debug periódico del estado de semáforos
+        if not hasattr(self, 'semaforo_debug_counter'):
+            self.semaforo_debug_counter = 0
+        self.semaforo_debug_counter += 1
+        
+        if self.semaforo_debug_counter % 25 == 0:  # Cada 25 lecturas
+            print(f"🚦 ESTADO SEMÁFOROS: Verde={verdes}, Amarillo={amarillos}, Rojo={rojos}")
+            # Mostrar algunos ejemplos
+            if data.semaforos_verdes:
+                ejemplos_verdes = [s.id for s in data.semaforos_verdes[:3]]
+                print(f"   Verdes: {', '.join(ejemplos_verdes)}")
+            if data.semaforos_rojos:
+                ejemplos_rojos = [s.id for s in data.semaforos_rojos[:3]]
+                print(f"   Rojos: {', '.join(ejemplos_rojos)}")
+        
         # Alerta si hay muchos semáforos en rojo
         if rojos >= 5:
             alerta_id = "muchos_semaforos_rojos"
             if alerta_id not in self.alertas_activas:
-                print(f"ALERTA: {rojos} semáforos en ROJO!")
+                print(f"🚨 CONGESTIÓN: {rojos}/10 semáforos en ROJO!")
                 self.alertas_activas.add(alerta_id)
         else:
             # Remover alerta si ya no hay muchos rojos
             alerta_id = "muchos_semaforos_rojos"
             if alerta_id in self.alertas_activas:
+                print(f"✅ TRÁFICO MEJORADO: {rojos}/10 semáforos en rojo")
                 self.alertas_activas.remove(alerta_id)
     
     def _process_distancias(self, data: ArduinoDataParser):
-        """Procesa información de distancias."""
-        # Verificar distancias críticas
+        """Procesa información de distancias con detección de paradas."""
+        # Mapeo de sensores: P1=TU3, P2=TU4, P3=TM1, P4=TM2, P5/P6=sin sensor real
+        paradas_importantes = ['P1', 'P2', 'P3', 'P4']  # Solo las que tienen sensores reales
+        
         for dist in data.distancias:
-            if dist.distancia_cm < 10:  # Muy cerca
-                alerta_id = f"distancia_critica_{dist.id}"
-                if alerta_id not in self.alertas_activas:
-                    print(f"ALERTA: {dist.id} muy cerca ({dist.distancia_cm:.1f} cm)")
-                    self.alertas_activas.add(alerta_id)
+            if dist.id in paradas_importantes:
+                alerta_id = f"vehiculo_parada_{dist.id}"
+                
+                # Umbral de detección de vehículos (más sensible para detectar mejor)
+                if dist.distancia_cm < 15.0:  # Vehículo presente
+                    if alerta_id not in self.alertas_activas:
+                        print(f"🚌 VEHÍCULO DETECTADO: {dist.id} - {dist.distancia_cm:.1f} cm")
+                        self.alertas_activas.add(alerta_id)
+                else:  # Vehículo ausente
+                    if alerta_id in self.alertas_activas:
+                        print(f"🚌 VEHÍCULO SALIÓ: {dist.id} - {dist.distancia_cm:.1f} cm")
+                        self.alertas_activas.remove(alerta_id)
+            
+            # Debug: mostrar todas las distancias cada 10 lecturas
+            if hasattr(self, 'debug_counter'):
+                self.debug_counter += 1
             else:
-                # Remover alerta si ya no está cerca
-                alerta_id = f"distancia_critica_{dist.id}"
-                if alerta_id in self.alertas_activas:
-                    self.alertas_activas.remove(alerta_id)
+                self.debug_counter = 1
+                
+            if self.debug_counter % 50 == 0:  # Cada 50 lecturas (aprox cada 100 segundos)
+                print(f"📊 DEBUG DISTANCIAS: {dist.id}={dist.distancia_cm:.1f}cm", end=" ")
+                if dist.id == 'P6':  # Último sensor, nueva línea
+                    print()
     
     def _process_gas(self, data: ArduinoDataParser):
-        """Procesa información de sensores de gas."""
+        """Procesa información de sensores de gas con histéresis y debug."""
+        # Debug periódico de valores de gas
+        if not hasattr(self, 'gas_debug_counter'):
+            self.gas_debug_counter = 0
+        self.gas_debug_counter += 1
+        
+        if self.gas_debug_counter % 30 == 0:  # Cada 30 lecturas
+            valores_gas = [f"{gas.zona}={gas.ppm}ppm" for gas in data.gas]
+            print(f"🔥 VALORES GAS: {', '.join(valores_gas)}")
+        
         for gas in data.gas:
-            if gas.is_alto:
-                alerta_id = f"gas_alto_{gas.zona}"
-                if alerta_id not in self.alertas_activas:
-                    print(f"ALERTA: Gas alto en zona {gas.zona} ({gas.ppm} ppm)")
+            alerta_id = f"gas_alto_{gas.zona}"
+            
+            # Histéresis mejorada: solo alertar por humo real, no fluctuaciones normales
+            umbral_activacion = 275  # Solo si realmente hay humo (Arduino HUMO_UMBRAL=500 → ~275ppm)
+            umbral_desactivacion = 250  # Volver a valores normales
+            
+            if alerta_id not in self.alertas_activas:
+                # Solo activar si supera el umbral de activación (humo detectado)
+                if gas.ppm >= umbral_activacion:
+                    print(f"🔥 HUMO DETECTADO: Zona {gas.zona} ({gas.ppm} ppm)")
                     self.alertas_activas.add(alerta_id)
             else:
-                # Remover alerta si el gas ya no está alto
-                alerta_id = f"gas_alto_{gas.zona}"
-                if alerta_id in self.alertas_activas:
+                # Solo desactivar si baja del umbral de desactivación
+                if gas.ppm < umbral_desactivacion:
+                    print(f"✅ HUMO ELIMINADO: Zona {gas.zona} ({gas.ppm} ppm)")
                     self.alertas_activas.remove(alerta_id)
     
     def _process_sismo(self, data: ArduinoDataParser):
@@ -455,9 +594,14 @@ class ArduinoMainController:
         if data.tiene_infracciones:
             alerta_id = "infracciones_activas"
             if alerta_id not in self.alertas_activas:
-                print(f"ALERTA: {len(data.infracciones)} infracciones activas")
+                print(f"🚨 ALERTA: {len(data.infracciones)} infracciones activas")
                 for infraccion in data.infracciones:
                     print(f"   - {infraccion}")
+                    print(f"   📡 Publicando infracción individual: {infraccion}")
+                    
+                    # Enviar cada infracción individualmente por MQTT para que llegue al WebSocket
+                    self._publish_individual_infraction(infraccion)
+                
                 self.alertas_activas.add(alerta_id)
         else:
             # Remover alerta si ya no hay infracciones

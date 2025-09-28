@@ -78,100 +78,171 @@ class DatabaseManager:
     def _save_arduino_data(self, payload: Dict[str, Any]) -> bool:
         """Guardar datos del Arduino"""
         try:
-            # Determinar qué tipo de datos es basado en el payload
-            if "gas_ppm" in payload:
-                # Es una medición de gas
-                query = """
-                INSERT INTO GasMeasurement (ts, ppm) 
-                VALUES (datetime('now'), ?)
-                """
-                result = self.execute_query(query, (payload["gas_ppm"],))
-                logger.info(f"Medición de gas guardada: {payload['gas_ppm']} ppm")
-                return result is not None
+            saved_something = False
+            
+            # Procesar datos de gas
+            if "gas" in payload and isinstance(payload["gas"], list):
+                for gas_data in payload["gas"]:
+                    if "ppm" in gas_data:
+                        query = """
+                        INSERT INTO GasMeasurement (ts, ppm) 
+                        VALUES (datetime('now'), ?)
+                        """
+                        result = self.execute_query(query, (gas_data["ppm"],))
+                        if result is not None:
+                            logger.info(f"Medición de gas guardada: {gas_data['ppm']} ppm (zona: {gas_data.get('zona', 'N/A')})")
+                            saved_something = True
                 
-            elif "seismic_intensity" in payload:
-                # Es una medición sísmica
-                query = """
-                INSERT INTO SeismicMeasurement (ts, intensity_g) 
-                VALUES (datetime('now'), ?)
-                """
-                result = self.execute_query(query, (payload["seismic_intensity"],))
-                logger.info(f"Medición sísmica guardada: {payload['seismic_intensity']} g")
-                return result is not None
-                
-            elif "alert_type" in payload:
-                # Es una alerta
-                # Primero obtener el tipo de alerta
-                alert_type_query = "SELECT alert_type_id FROM AlertType WHERE code = ?"
-                alert_type_result = self.execute_query(alert_type_query, (payload["alert_type"],))
-                
-                if alert_type_result:
-                    alert_type_id = alert_type_result[0]["alert_type_id"]
-                    
-                    # Insertar la alerta principal
-                    alert_query = """
-                    INSERT INTO Alert (ts, alert_type_id, severity, bus_id, stop_id) 
-                    VALUES (datetime('now'), ?, ?, ?, ?)
+            # Procesar datos sísmicos
+            if payload.get("tiene_sismo", False) and "sismo" in payload:
+                sismo_data = payload["sismo"]
+                if "magnitud" in sismo_data:
+                    query = """
+                    INSERT INTO SeismicMeasurement (ts, intensity_g) 
+                    VALUES (datetime('now'), ?)
                     """
-                    bus_id = payload.get("bus_id")
-                    stop_id = payload.get("stop_id")
-                    severity = payload.get("severity", 2)
-                    
-                    result = self.execute_query(alert_query, (alert_type_id, severity, bus_id, stop_id))
-                    
+                    result = self.execute_query(query, (sismo_data["magnitud"],))
                     if result is not None:
-                        # Obtener el ID de la alerta insertada
-                        alert_id_query = "SELECT last_insert_rowid() as alert_id"
-                        alert_id_result = self.execute_query(alert_id_query)
+                        logger.info(f"Medición sísmica guardada: {sismo_data['magnitud']} g (origen: {sismo_data.get('origen', 'N/A')})")
+                        saved_something = True
+            
+            # Procesar infracciones de tráfico
+            if "infracciones" in payload and isinstance(payload["infracciones"], list):
+                for infraccion in payload["infracciones"]:
+                    # Obtener el tipo de alerta INFRACCION
+                    alert_type_query = "SELECT alert_type_id FROM AlertType WHERE code = 'INFRACCION'"
+                    alert_type_result = self.execute_query(alert_type_query)
+                    
+                    if alert_type_result:
+                        alert_type_id = alert_type_result[0]["alert_type_id"]
                         
-                        if alert_id_result:
-                            alert_id = alert_id_result[0]["alert_id"]
+                        # Insertar la alerta principal
+                        alert_query = """
+                        INSERT INTO Alert (ts, alert_type_id, severity, bus_id, stop_id) 
+                        VALUES (datetime('now'), ?, ?, ?, ?)
+                        """
+                        # Manejar tanto strings ("S1") como diccionarios
+                        if isinstance(infraccion, dict):
+                            severity = infraccion.get("severity", 3)
+                            signal_id = infraccion.get("signal_id", str(infraccion))
+                        else:
+                            # Es un string como "S1"
+                            severity = 3  # Severidad por defecto
+                            signal_id = str(infraccion)
+                        
+                        result = self.execute_query(alert_query, (alert_type_id, severity, None, None))
+                        
+                        if result is not None:
+                            # Obtener el ID de la alerta insertada
+                            alert_id_query = "SELECT last_insert_rowid() as alert_id"
+                            alert_id_result = self.execute_query(alert_id_query)
                             
-                            # Insertar en la tabla específica según el tipo
-                            if payload["alert_type"] == "INFRACCION":
+                            if alert_id_result:
+                                alert_id = alert_id_result[0]["alert_id"]
+                                
+                                # Insertar en TrafficInfraction
                                 infraction_query = """
                                 INSERT INTO TrafficInfraction (alert_id, signal_color) 
                                 VALUES (?, ?)
                                 """
-                                signal_color = payload.get("signal_color", "red")
-                                self.execute_query(infraction_query, (alert_id, signal_color))
+                                # Usar signal_color de la infracción o por defecto "red"
+                                if isinstance(infraccion, dict):
+                                    signal_color = infraccion.get("signal_color", "red")
+                                else:
+                                    signal_color = "red"  # Por defecto para strings como "S1"
                                 
-                            elif payload["alert_type"] == "PANICO":
+                                self.execute_query(infraction_query, (alert_id, signal_color))
+                                logger.info(f"Infracción de tráfico guardada: {signal_id} - {signal_color}")
+                                saved_something = True
+            
+            # Procesar botones de pánico activos
+            if "botones_panico_activos" in payload and isinstance(payload["botones_panico_activos"], list):
+                for boton in payload["botones_panico_activos"]:
+                    # Obtener el tipo de alerta PANICO
+                    alert_type_query = "SELECT alert_type_id FROM AlertType WHERE code = 'PANICO'"
+                    alert_type_result = self.execute_query(alert_type_query)
+                    
+                    if alert_type_result:
+                        alert_type_id = alert_type_result[0]["alert_type_id"]
+                        
+                        # Insertar la alerta principal
+                        alert_query = """
+                        INSERT INTO Alert (ts, alert_type_id, severity, bus_id, stop_id) 
+                        VALUES (datetime('now'), ?, ?, ?, ?)
+                        """
+                        severity = boton.get("severity", 1)
+                        stop_id = boton.get("stop_id")
+                        result = self.execute_query(alert_query, (alert_type_id, severity, None, stop_id))
+                        
+                        if result is not None:
+                            # Obtener el ID de la alerta insertada
+                            alert_id_query = "SELECT last_insert_rowid() as alert_id"
+                            alert_id_result = self.execute_query(alert_id_query)
+                            
+                            if alert_id_result:
+                                alert_id = alert_id_result[0]["alert_id"]
+                                
+                                # Insertar en PanicEvent
                                 panic_query = """
                                 INSERT INTO PanicEvent (alert_id, button_id) 
                                 VALUES (?, ?)
                                 """
-                                button_id = payload.get("button_id", 1)
+                                button_id = boton.get("button_id", 1)
                                 self.execute_query(panic_query, (alert_id, button_id))
-                                
-                            elif payload["alert_type"] == "SISMO":
-                                seismic_query = """
-                                INSERT INTO SeismicEvent (alert_id, intensity_g, duration_ms) 
-                                VALUES (?, ?, ?)
-                                """
-                                intensity = payload.get("intensity_g", 0.0)
-                                duration = payload.get("duration_ms", 0)
-                                self.execute_query(seismic_query, (alert_id, intensity, duration))
-                                
-                            elif payload["alert_type"] == "GAS":
-                                gas_query = """
-                                INSERT INTO GasEvent (alert_id, ppm, threshold_ppm) 
-                                VALUES (?, ?, ?)
-                                """
-                                ppm = payload.get("ppm", 0.0)
-                                threshold = payload.get("threshold_ppm", 100.0)
-                                self.execute_query(gas_query, (alert_id, ppm, threshold))
-                        
-                        logger.info(f"Alerta guardada: {payload['alert_type']}")
-                        return True
-                
-                logger.warning(f"Tipo de alerta no reconocido: {payload['alert_type']}")
-                return False
-                
-            else:
-                # Datos genéricos del Arduino
-                logger.info(f"Datos genéricos del Arduino guardados: {payload}")
+                                logger.info(f"Botón de pánico guardado: {button_id}")
+                                saved_something = True
+            
+            # Procesar datos de buses
+            if "buses" in payload and isinstance(payload["buses"], list):
+                for bus_data in payload["buses"]:
+                    bus_code = bus_data.get("bus_code", "")
+                    latitude = bus_data.get("latitude")
+                    longitude = bus_data.get("longitude")
+                    speed_kmh = bus_data.get("speed_kmh")
+                    distance_to_next_stop_m = bus_data.get("distance_to_next_stop_m")
+                    
+                    # Validar que tenemos datos mínimos
+                    if not bus_code or latitude is None or longitude is None:
+                        logger.warning(f"Datos de bus incompletos: {bus_data}")
+                        continue
+                    
+                    # Obtener bus_id del código
+                    bus_query = "SELECT bus_id FROM Bus WHERE code = ?"
+                    bus_result = self.execute_query(bus_query, (bus_code,))
+                    
+                    if not bus_result:
+                        logger.warning(f"Bus no encontrado con código: {bus_code}")
+                        continue
+                    
+                    bus_id = bus_result[0]["bus_id"]
+                    
+                    # Insertar posición del bus
+                    position_query = """
+                    INSERT INTO BusPosition (bus_id, ts, latitude, longitude, speed_kmh, distance_to_next_stop_m) 
+                    VALUES (?, datetime('now'), ?, ?, ?, ?)
+                    """
+                    
+                    result = self.execute_query(position_query, (
+                        bus_id,
+                        latitude,
+                        longitude,
+                        speed_kmh,
+                        distance_to_next_stop_m
+                    ))
+                    
+                    if result is not None:
+                        logger.info(f"Posición de bus guardada: {bus_code} - Lat: {latitude}, Lng: {longitude}")
+                        saved_something = True
+                    else:
+                        logger.error(f"Error insertando posición de bus: {bus_code}")
+            
+            # Si se guardó algo, retornar True
+            if saved_something:
                 return True
+            
+            # Si no se guardó nada específico, es un payload genérico válido
+            logger.info(f"Datos genéricos del Arduino procesados (sin datos específicos para guardar)")
+            return True
                 
         except Exception as e:
             logger.error(f"Error guardando datos del Arduino: {e}")
@@ -180,9 +251,51 @@ class DatabaseManager:
     def _save_bus_data(self, topic: str, payload: Dict[str, Any]) -> bool:
         """Guardar datos de buses"""
         try:
-            # Aquí implementarías la lógica específica para guardar datos de buses
-            logger.info(f"Guardando datos de bus: {topic} - {payload}")
-            return True
+            logger.info(f"Procesando datos de bus: {topic} - {payload}")
+            
+            # Extraer datos del payload
+            bus_code = payload.get("bus_code", "")
+            latitude = payload.get("latitude")
+            longitude = payload.get("longitude")
+            speed_kmh = payload.get("speed_kmh")
+            distance_to_next_stop_m = payload.get("distance_to_next_stop_m")
+            
+            # Validar que tenemos datos mínimos
+            if not bus_code or latitude is None or longitude is None:
+                logger.warning(f"Datos de bus incompletos: {payload}")
+                return False
+            
+            # Obtener bus_id del código
+            bus_query = "SELECT bus_id FROM Bus WHERE code = ?"
+            bus_result = self.execute_query(bus_query, (bus_code,))
+            
+            if not bus_result:
+                logger.warning(f"Bus no encontrado con código: {bus_code}")
+                return False
+            
+            bus_id = bus_result[0]["bus_id"]
+            
+            # Insertar posición del bus
+            position_query = """
+            INSERT INTO BusPosition (bus_id, ts, latitude, longitude, speed_kmh, distance_to_next_stop_m) 
+            VALUES (?, datetime('now'), ?, ?, ?, ?)
+            """
+            
+            result = self.execute_query(position_query, (
+                bus_id,
+                latitude,
+                longitude,
+                speed_kmh,
+                distance_to_next_stop_m
+            ))
+            
+            if result is not None:
+                logger.info(f"Posición de bus guardada: {bus_code} - Lat: {latitude}, Lng: {longitude}")
+                return True
+            else:
+                logger.error(f"Error insertando posición de bus: {bus_code}")
+                return False
+                
         except Exception as e:
             logger.error(f"Error guardando datos de bus: {e}")
             return False

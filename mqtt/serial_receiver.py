@@ -112,13 +112,19 @@ class ArduinoSerialReceiver:
                     stopbits=self.config.stopbits
                 )
                 
-                # Esperar a que Arduino se reinicie
-                time.sleep(2)
+                # Esperar a que Arduino se reinicie y estabilice
+                time.sleep(3)
                 
                 if self.serial_connection.is_open:
                     self.logger.info(f"Conexión serial establecida en {port}")
                     # Actualizar la configuración con el puerto que funcionó
                     self.config.port = port
+                    # Limpiar buffer de arranque/bootloader
+                    try:
+                        self.serial_connection.reset_input_buffer()
+                        self.serial_connection.reset_output_buffer()
+                    except Exception:
+                        pass
                     return True
                 else:
                     self.logger.warning(f"No se pudo abrir la conexión en {port}")
@@ -207,6 +213,16 @@ class ArduinoSerialReceiver:
         Args:
             data_line: Línea de datos JSON recibida
         """
+        # Procesar líneas de infracción en tiempo real antes del JSON
+        stripped = data_line.lstrip()
+        if stripped.startswith('INFRACCION ROJO'):
+            self._process_infraction_line(stripped)
+            return
+        
+        # Ignorar otras líneas que no sean JSON
+        if not stripped.startswith('{'):
+            return
+
         try:
             # Usar el parser especializado para Arduino
             parsed_data = parse_arduino_json(data_line)
@@ -233,6 +249,32 @@ class ArduinoSerialReceiver:
             # Llamar callback de error si está configurado
             if self.on_parse_error:
                 self.on_parse_error(error_msg, data_line)
+    
+    def _process_infraction_line(self, line: str):
+        """
+        Procesa líneas de infracción en tiempo real.
+        
+        Args:
+            line: Línea de infracción (ej: "INFRACCION ROJO SD1 -> Semaforo S3, cm=5.2")
+        """
+        try:
+            # Parsear: "INFRACCION ROJO SD1 -> Semaforo S3, cm=5.2"
+            import re
+            match = re.match(r'INFRACCION ROJO SD(\d+) -> Semaforo S(\d+), cm=([0-9.]+)', line)
+            if match:
+                sd_num = int(match.group(1))
+                semaforo_id = f"S{match.group(2)}"  # Agregar "S" al número para formato correcto
+                distancia = float(match.group(3))
+                
+                self.logger.warning(f"🚨 INFRACCIÓN DETECTADA: SD{sd_num} -> S{semaforo_id} ({distancia}cm)")
+                
+                # Llamar callback de infracción si está configurado
+                if hasattr(self, 'on_infraction_detected') and self.on_infraction_detected:
+                    self.on_infraction_detected(sd_num, semaforo_id, distancia)
+            else:
+                self.logger.warning(f"Formato de infracción no reconocido: {line}")
+        except Exception as e:
+            self.logger.error(f"Error procesando línea de infracción: {e}")
     
     def _handle_json_data(self, data: Dict[str, Any]):
         """
@@ -301,14 +343,23 @@ class ArduinoSerialReceiver:
             callback: Función que recibe (error_msg, raw_data)
         """
         self.on_parse_error = callback
+    
+    def set_infraction_callback(self, callback: Callable[[int, str, float], None]):
+        """
+        Configura el callback para infracciones detectadas.
+        
+        Args:
+            callback: Función que recibe (sd_num, semaforo_id, distancia)
+        """
+        self.on_infraction_detected = callback
 
 
 def main():
     """Función principal para pruebas del módulo."""
     # Configuración por defecto
     config = SerialConfig(
-        port='/dev/ttyUSB0', 
-        baudrate=9600
+        port='/dev/ttyACM0', 
+        baudrate=115200
     )
     
     # Crear instancia del receptor

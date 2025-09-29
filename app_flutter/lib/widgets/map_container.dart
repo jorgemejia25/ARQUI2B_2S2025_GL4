@@ -31,6 +31,12 @@ class _MapContainerState extends State<MapContainer> {
   final TransformationController _transformationController =
       TransformationController();
 
+  // Dimensiones base del SVG (para calcular auto-fit)
+  static const double _svgWidth = 628;
+  static const double _svgHeight = 852;
+
+  // (Estilo dinámico removido, usamos el SVG tal cual)
+
   @override
   void initState() {
     super.initState();
@@ -55,18 +61,47 @@ class _MapContainerState extends State<MapContainer> {
     SvgTrafficService.initializeBusStops();
 
     // Cargar el contenido del SVG
-    final svgContent = await SvgTrafficService.loadSvgContent();
-
+    final rawSvg = await SvgTrafficService.loadSvgContent();
     setState(() {
-      _svgContent = svgContent;
+      _svgContent = rawSvg;
       _isLoading = false;
     });
+
+  // Aplicar auto-ajuste (fit) tras el primer frame
+  _applyInitialFit();
 
     // Debug: verificar las paradas
     // SvgTrafficService.debugBusStops();
 
     // Iniciar simulación automática (opcional) - deshabilitado para pruebas
     // _startSimulation();
+  }
+
+  void _applyInitialFit() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = context.size;
+      if (box == null || box.width == 0 || box.height == 0) return;
+
+      final scaleW = box.width / _svgWidth;
+      final scaleH = box.height / _svgHeight;
+      double scale = scaleW < scaleH ? scaleW : scaleH;
+      // Margen (90% del máximo para dejar espacio alrededor)
+      scale *= 0.9;
+      // Respetar límites declarados en InteractiveViewer (minScale/maxScale)
+      scale = scale.clamp(0.5, 5.0);
+
+      final scaledW = _svgWidth * scale;
+      final scaledH = _svgHeight * scale;
+      final offsetX = (box.width - scaledW) / 2;
+      final offsetY = (box.height - scaledH) / 2;
+
+      // Matriz: primero escalar, luego trasladar (ajustamos la traslación al espacio ya escalado)
+      final m = Matrix4.identity();
+      m.scale(scale);
+      m.translate(offsetX / scale, offsetY / scale);
+      _transformationController.value = m;
+    });
   }
 
   void _setupWebSocket() {
@@ -124,7 +159,6 @@ class _MapContainerState extends State<MapContainer> {
     SvgTrafficService.changeTrafficLightGroupState(groupId, trafficState);
 
     final newSvgContent = SvgTrafficService.getSvgWithUpdatedColors();
-
     setState(() {
       _svgContent = newSvgContent;
     });
@@ -168,7 +202,8 @@ class _MapContainerState extends State<MapContainer> {
 
     // Actualizar el SVG con los nuevos colores de paradas
     setState(() {
-      _svgContent = SvgTrafficService.getSvgWithUpdatedColors();
+      final updated = SvgTrafficService.getSvgWithUpdatedColors();
+      _svgContent = updated;
     });
   }
 
@@ -365,17 +400,15 @@ class _MapContainerState extends State<MapContainer> {
                   ),
                 ),
 
-                // Botón Reset Zoom (opcional)
+                // Botón Re-ajustar (fit)
                 FloatingActionButton(
-                  heroTag: 'fabResetZoom',
-                  onPressed: () {
-                    _transformationController.value = Matrix4.identity();
-                  },
+                  heroTag: 'fabRefit',
+                  onPressed: _applyInitialFit,
                   backgroundColor: Colors.grey[700],
                   foregroundColor: Colors.white,
                   mini: true,
-                  tooltip: 'Reset Zoom',
-                  child: const Icon(Icons.center_focus_strong, size: 16),
+                  tooltip: 'Ajustar y centrar mapa',
+                  child: const Icon(Icons.fit_screen, size: 16),
                 ),
               ],
             ),

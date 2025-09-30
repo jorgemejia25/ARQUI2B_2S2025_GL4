@@ -7,6 +7,7 @@ import '../services/bus_stop_service.dart';
 import '../services/bus_stop_websocket_service.dart';
 import '../models/websocket_message.dart';
 import '../models/traffic_light.dart';
+import '../models/bus_stop.dart';
 import 'bus_stop_eta_widget.dart';
 import 'eta_info_modal.dart';
 
@@ -20,6 +21,7 @@ class MapContainer extends StatefulWidget {
 class _MapContainerState extends State<MapContainer> {
   String _svgContent = '';
   bool _isLoading = true;
+  bool _didInitialFit = false; // control para ajuste inicial una vez
   Timer? _simulationTimer;
   final WebSocketService _webSocketService = WebSocketService.instance;
   final BusStopWebSocketService _busStopWebSocketService =
@@ -33,7 +35,7 @@ class _MapContainerState extends State<MapContainer> {
 
   // Dimensiones base del SVG (para calcular auto-fit)
   static const double _svgWidth = 628;
-  static const double _svgHeight = 852;
+  // _svgHeight eliminado (no se usa tras cambio de layout)
 
   // (Estilo dinámico removido, usamos el SVG tal cual)
 
@@ -67,8 +69,7 @@ class _MapContainerState extends State<MapContainer> {
       _isLoading = false;
     });
 
-  // Aplicar auto-ajuste (fit) tras el primer frame
-  _applyInitialFit();
+    // El ajuste inicial se hará dentro del LayoutBuilder según el ancho disponible
 
     // Debug: verificar las paradas
     // SvgTrafficService.debugBusStops();
@@ -77,31 +78,19 @@ class _MapContainerState extends State<MapContainer> {
     // _startSimulation();
   }
 
-  void _applyInitialFit() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final box = context.size;
-      if (box == null || box.width == 0 || box.height == 0) return;
+  void _applyInitialFitWithWidth(double width) {
+    if (_didInitialFit || width <= 0) return;
+    double scale = (width / _svgWidth) * 0.98; // margen ligero
+    scale = scale.clamp(0.5, 5.0);
+    _transformationController.value = Matrix4.identity()..scale(scale);
+    _didInitialFit = true;
+  }
 
-      final scaleW = box.width / _svgWidth;
-      final scaleH = box.height / _svgHeight;
-      double scale = scaleW < scaleH ? scaleW : scaleH;
-      // Margen (90% del máximo para dejar espacio alrededor)
-      scale *= 0.9;
-      // Respetar límites declarados en InteractiveViewer (minScale/maxScale)
-      scale = scale.clamp(0.5, 5.0);
-
-      final scaledW = _svgWidth * scale;
-      final scaledH = _svgHeight * scale;
-      final offsetX = (box.width - scaledW) / 2;
-      final offsetY = (box.height - scaledH) / 2;
-
-      // Matriz: primero escalar, luego trasladar (ajustamos la traslación al espacio ya escalado)
-      final m = Matrix4.identity();
-      m.scale(scale);
-      m.translate(offsetX / scale, offsetY / scale);
-      _transformationController.value = m;
-    });
+  void _refitToWidth() {
+    final width = MediaQuery.of(context).size.width;
+    double scale = (width / _svgWidth) * 0.98;
+    scale = scale.clamp(0.5, 5.0);
+    _transformationController.value = Matrix4.identity()..scale(scale);
   }
 
   void _setupWebSocket() {
@@ -338,101 +327,242 @@ class _MapContainerState extends State<MapContainer> {
     }
 
     return Container(
+      color: Colors.grey[100],
       width: double.infinity,
       height: double.infinity,
-      color: Colors.grey[100],
-      child: Stack(
+      child: Column(
         children: [
-          // SVG del mapa con InteractiveViewer
-          InteractiveViewer(
-            transformationController: _transformationController,
-            minScale: 0.5,
-            maxScale: 5.0,
-            constrained: false,
-            boundaryMargin: const EdgeInsets.all(20),
-            child: Stack(
-              children: [
-                // SVG del mapa
-                SvgPicture.string(
-                  _svgContent,
-                  fit: BoxFit.contain,
-                  allowDrawingOutsideViewBox: true,
-                ),
-
-                // Overlay de paradas de bus con ETA
-                const BusStopsEtaOverlay(),
-              ],
-            ),
-          ),
-
-          // Botones de control de zoom
-          Positioned(
-            top: 20,
-            right: 20,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Botón Zoom In (+)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: FloatingActionButton(
-                    heroTag: 'fabZoomIn',
-                    onPressed: _zoomIn,
-                    backgroundColor: Colors.blue[600],
-                    foregroundColor: Colors.white,
-                    mini: true,
-                    tooltip: 'Zoom In',
-                    child: const Icon(Icons.add, size: 20),
-                  ),
-                ),
-
-                // Botón Zoom Out (-)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: FloatingActionButton(
-                    heroTag: 'fabZoomOut',
-                    onPressed: _zoomOut,
-                    backgroundColor: Colors.blue[600],
-                    foregroundColor: Colors.white,
-                    mini: true,
-                    tooltip: 'Zoom Out',
-                    child: const Icon(Icons.remove, size: 20),
-                  ),
-                ),
-
-                // Botón Re-ajustar (fit)
-                FloatingActionButton(
-                  heroTag: 'fabRefit',
-                  onPressed: _applyInitialFit,
-                  backgroundColor: Colors.grey[700],
-                  foregroundColor: Colors.white,
-                  mini: true,
-                  tooltip: 'Ajustar y centrar mapa',
-                  child: const Icon(Icons.fit_screen, size: 16),
-                ),
-              ],
-            ),
-          ),
-
-          // Botón flotante para mostrar información de ETA
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton.extended(
-              heroTag: 'fabEtaInfo',
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => const EtaInfoModal(),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                _applyInitialFitWithWidth(constraints.maxWidth);
+                return Stack(
+                  children: [
+                    InteractiveViewer(
+                      transformationController: _transformationController,
+                      minScale: 0.5,
+                      maxScale: 5.0,
+                      constrained: false,
+                      boundaryMargin: const EdgeInsets.all(20),
+                      child: Stack(
+                        children: [
+                          SvgPicture.string(
+                            _svgContent,
+                            fit: BoxFit.contain,
+                            allowDrawingOutsideViewBox: true,
+                          ),
+                          const BusStopsEtaOverlay(),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      top: 20,
+                      right: 20,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: FloatingActionButton(
+                              heroTag: 'fabZoomIn',
+                              onPressed: _zoomIn,
+                              backgroundColor: Colors.blue[600],
+                              foregroundColor: Colors.white,
+                              mini: true,
+                              tooltip: 'Zoom In',
+                              child: const Icon(Icons.add, size: 20),
+                            ),
+                          ),
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: FloatingActionButton(
+                              heroTag: 'fabZoomOut',
+                              onPressed: _zoomOut,
+                              backgroundColor: Colors.blue[600],
+                              foregroundColor: Colors.white,
+                              mini: true,
+                              tooltip: 'Zoom Out',
+                              child: const Icon(Icons.remove, size: 20),
+                            ),
+                          ),
+                          FloatingActionButton(
+                            heroTag: 'fabRefit',
+                            onPressed: _refitToWidth,
+                            backgroundColor: Colors.grey[700],
+                            foregroundColor: Colors.white,
+                            mini: true,
+                            tooltip: 'Ajustar al ancho',
+                            child: const Icon(Icons.fit_screen, size: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 20,
+                      right: 20,
+                      child: FloatingActionButton.extended(
+                        heroTag: 'fabEtaInfo',
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => const EtaInfoModal(),
+                          );
+                        },
+                        backgroundColor: Colors.blue[600],
+                        foregroundColor: Colors.white,
+                        icon: const Icon(Icons.info_outline),
+                        label: const Text('Paradas'),
+                        tooltip: 'Ver información de paradas y ETA',
+                      ),
+                    ),
+                  ],
                 );
               },
-              backgroundColor: Colors.blue[600],
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.info_outline),
-              label: const Text('Paradas'),
-              tooltip: 'Ver información de paradas y ETA',
             ),
           ),
+          _BottomEtaPanel(busStopService: _busStopService),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomEtaPanel extends StatelessWidget {
+  final BusStopService busStopService;
+  const _BottomEtaPanel({required this.busStopService});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 140,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+        border: const Border(top: BorderSide(color: Color(0xFFE0E0E0))),
+      ),
+      child: StreamBuilder<Map<String, BusStopEtaInfo>>(
+        stream: busStopService.busStopsStream,
+        builder: (context, snapshot) {
+          final stopsMap = snapshot.data ?? {};
+          if (stopsMap.isEmpty) {
+            return const Center(
+              child: Text(
+                'Sin datos de paradas aún',
+                style: TextStyle(color: Colors.grey),
+              ),
+            );
+          }
+          final stops = stopsMap.values.toList()
+            ..sort((a, b) => a.busStop.id.compareTo(b.busStop.id));
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: stops.length,
+            itemBuilder: (context, index) {
+              return _EtaChip(info: stops[index]);
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EtaChip extends StatelessWidget {
+  final BusStopEtaInfo info;
+  const _EtaChip({required this.info});
+
+  Color _statusColor(BusStopState state) {
+    switch (state) {
+      case BusStopState.active:
+        return Colors.green;
+      case BusStopState.busy:
+        return Colors.red;
+      case BusStopState.waiting:
+        return Colors.orange;
+      case BusStopState.inactive:
+        return Colors.grey;
+    }
+    return Colors.grey; // fallback
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = info.latestEta;
+    final etaSeg = latest?.tiempoSegundos ?? 0;
+    final minutos = (etaSeg / 60).floor();
+    final segundos = etaSeg % 60;
+    final etaStr = etaSeg == 0 ? '--' : '${minutos}m ${segundos}s';
+    return Container(
+      width: 150,
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: _statusColor(info.busStop.state),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  info.busStop.displayName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'ETA',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[600],
+              letterSpacing: 0.5,
+            ),
+          ),
+            Text(
+              etaStr,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          if (latest != null)
+            Text(
+              latest.tipoTransporte,
+              style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+              overflow: TextOverflow.ellipsis,
+            ),
         ],
       ),
     );

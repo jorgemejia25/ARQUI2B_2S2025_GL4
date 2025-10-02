@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/websocket_message.dart';
+import 'config_service.dart';
 
 class BusStopWebSocketService {
   static BusStopWebSocketService? _instance;
@@ -13,8 +14,6 @@ class BusStopWebSocketService {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
   bool _isConnected = false;
-  final String _url =
-      'wss://arqui2b2s2025gl4-production.up.railway.app/ws/stops';
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
@@ -26,6 +25,13 @@ class BusStopWebSocketService {
   Function()? onDisconnected;
 
   bool get isConnected => _isConnected;
+
+  /// Obtener URL del WebSocket de paradas desde ConfigService
+  String get _url {
+    final configService = ConfigService.instance;
+    return configService.getServiceUrls()['wsStops'] ??
+        'ws://localhost:8001/ws/stops';
+  }
 
   /// Conectar al WebSocket de paradas
   Future<void> connect() async {
@@ -56,7 +62,7 @@ class BusStopWebSocketService {
       _reconnectAttempts = 0;
       onDisconnected?.call();
     } catch (e) {
-      print('Error desconectando WebSocket de paradas: $e');
+      // Error silencioso
     }
   }
 
@@ -123,12 +129,6 @@ class BusStopWebSocketService {
         ),
       );
 
-      // Log de depuración de ETA recibido
-      // ignore: avoid_print
-      print(
-        '[WS Paradas] ETA: stop=$stopId tipo=${etaMessage.data.tipoTransporte} t=${etaMessage.data.tiempoSegundos}s origen=${etaMessage.data.origen}',
-      );
-
       onEtaUpdate?.call(etaMessage);
     } catch (e) {
       onError?.call('Error procesando ETA desde parada: $e');
@@ -143,13 +143,9 @@ class BusStopWebSocketService {
   /// Manejar errores de WebSocket
   void _handleError(dynamic error) {
     _isConnected = false;
-    print('WebSocket de paradas Error: $error');
 
     // Manejar diferentes tipos de errores
     if (error.toString().contains('SocketException')) {
-      print(
-        'SocketException detectada en WebSocket de paradas - intentando reconectar...',
-      );
       _scheduleReconnect();
     } else {
       onError?.call('Error en WebSocket de paradas: $error');
@@ -159,7 +155,6 @@ class BusStopWebSocketService {
   /// Manejar desconexión
   void _handleDisconnection() {
     _isConnected = false;
-    print('WebSocket de paradas desconectado - intentando reconectar...');
     _scheduleReconnect();
     onDisconnected?.call();
   }
@@ -202,9 +197,6 @@ class BusStopWebSocketService {
   /// Programar reconexión automática con backoff exponencial
   void _scheduleReconnect() {
     if (_reconnectAttempts >= _maxReconnectAttempts) {
-      print(
-        'Máximo número de intentos de reconexión alcanzado para WebSocket de paradas',
-      );
       onError?.call(
         'No se pudo reconectar WebSocket de paradas después de $_maxReconnectAttempts intentos',
       );
@@ -216,19 +208,14 @@ class BusStopWebSocketService {
 
     // Backoff exponencial: 2, 4, 8, 16, 32 segundos
     final delay = Duration(seconds: 2 * _reconnectAttempts);
-    print(
-      'Reconectando WebSocket de paradas en ${delay.inSeconds} segundos (intento $_reconnectAttempts/$_maxReconnectAttempts)',
-    );
 
     _reconnectTimer = Timer(delay, () async {
       try {
         await connect();
         if (_isConnected) {
           _reconnectAttempts = 0; // Resetear contador en conexión exitosa
-          print('Reconexión exitosa del WebSocket de paradas');
         }
       } catch (e) {
-        print('Error en reconexión del WebSocket de paradas: $e');
         _scheduleReconnect(); // Intentar de nuevo
       }
     });

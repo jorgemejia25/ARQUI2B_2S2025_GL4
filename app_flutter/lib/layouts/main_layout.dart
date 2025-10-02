@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../config/app_theme.dart';
 
 /// Layout principal de la aplicación que maneja el scaffold y drawer.
 ///
@@ -22,20 +23,36 @@ class MainLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: AppTheme.purpleGradient,
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                boxShadow: AppTheme.neonShadow(
+                  AppTheme.primaryPurple,
+                  blur: 10,
+                ),
+              ),
+              child: const Icon(
+                Icons.flash_on_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(title, style: AppTheme.headingMedium),
+          ],
         ),
-        backgroundColor: const Color(0xFF1E3A8A),
+        backgroundColor: AppTheme.backgroundCard.withOpacity(0.8),
         elevation: 0,
-        centerTitle: true,
+        centerTitle: false,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
+            icon: Icon(Icons.menu_rounded, color: AppTheme.primaryPurple),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
@@ -59,36 +76,72 @@ class MainLayout extends StatelessWidget {
   ///   Un widget Drawer configurado con la navegación de la aplicación.
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
+      backgroundColor: AppTheme.backgroundCard,
       child: Container(
-        color: Colors.white,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppTheme.backgroundCard, AppTheme.backgroundDark],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
         child: Column(
           children: [
-            // Header simple del drawer
+            // Header moderno del drawer
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-              decoration: const BoxDecoration(color: Color(0xFF1E3A8A)),
-              child: const Column(
+              padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
+              decoration: BoxDecoration(
+                gradient: AppTheme.purpleGradient,
+                boxShadow: AppTheme.neonShadow(
+                  AppTheme.primaryPurple,
+                  blur: 20,
+                ),
+              ),
+              child: Column(
                 children: [
-                  Icon(Icons.traffic, size: 50, color: Colors.white),
-                  SizedBox(height: 12),
-                  Text(
-                    'Gestión de Tráfico',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(
+                        AppTheme.radiusMedium,
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.flash_on_rounded,
+                      size: 40,
                       color: Colors.white,
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Sistema de',
+                    style: AppTheme.bodyMedium.copyWith(
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Seguridad de Tráfico',
+                    style: AppTheme.headingMedium.copyWith(color: Colors.white),
                     textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
 
-            // Lista de opciones de navegación simplificada
+            // Lista de opciones de navegación
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppTheme.spaceMedium,
+                  horizontal: AppTheme.spaceSmall,
+                ),
                 children: [
                   _buildDrawerItem(
                     context,
@@ -129,16 +182,31 @@ class MainLayout extends StatelessWidget {
               ),
             ),
 
-            // Footer simple
+            // Footer moderno
             Container(
-              padding: const EdgeInsets.all(20),
-              child: const Row(
+              margin: const EdgeInsets.all(AppTheme.spaceMedium),
+              padding: const EdgeInsets.all(AppTheme.spaceMedium),
+              decoration: BoxDecoration(
+                color: AppTheme.backgroundElevated.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                border: Border.all(
+                  color: AppTheme.primaryPurple.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
                 children: [
-                  Icon(Icons.settings, color: Color(0xFF64748B), size: 20),
-                  SizedBox(width: 12),
+                  Icon(
+                    Icons.settings_rounded,
+                    color: AppTheme.primaryPurpleLight,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
                   Text(
                     'Configuración',
-                    style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                    style: AppTheme.bodyMedium.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -169,25 +237,64 @@ class MainLayout extends StatelessWidget {
     required String route,
     bool isSelected = false,
   }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? const Color(0xFF1E3A8A) : const Color(0xFF64748B),
-        size: 24,
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        vertical: AppTheme.spaceXSmall,
+        horizontal: AppTheme.spaceSmall,
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-          color: isSelected ? const Color(0xFF1E3A8A) : const Color(0xFF1E3A8A),
+      decoration: BoxDecoration(
+        gradient: isSelected ? AppTheme.purpleGradient : null,
+        color: isSelected ? null : AppTheme.backgroundElevated.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        border: Border.all(
+          color: isSelected
+              ? AppTheme.primaryPurple.withOpacity(0.5)
+              : AppTheme.greyMedium.withOpacity(0.2),
+          width: 1,
         ),
+        boxShadow: isSelected
+            ? AppTheme.neonShadow(AppTheme.primaryPurple, blur: 15)
+            : null,
       ),
-      selected: isSelected,
-      selectedTileColor: const Color(0xFF1E3A8A).withValues(alpha: 0.1),
-      onTap: () {
-        context.go(route);
-        Navigator.pop(context);
-      },
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spaceMedium,
+          vertical: AppTheme.spaceXSmall,
+        ),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Colors.white.withOpacity(0.2)
+                : AppTheme.greyDark,
+            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+          ),
+          child: Icon(
+            icon,
+            color: isSelected ? Colors.white : AppTheme.primaryPurpleLight,
+            size: 22,
+          ),
+        ),
+        title: Text(
+          title,
+          style: AppTheme.bodyMedium.copyWith(
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? Colors.white : AppTheme.textPrimary,
+          ),
+        ),
+        trailing: isSelected
+            ? Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.white,
+                size: 16,
+              )
+            : null,
+        selected: isSelected,
+        onTap: () {
+          context.go(route);
+          Navigator.pop(context);
+        },
+      ),
     );
   }
 }

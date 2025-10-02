@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/dashboard_models.dart';
+import '../config/app_theme.dart';
 
 class GasChart extends StatelessWidget {
-  final List<ChartDataPoint> data;
+  final List<GasDataPoint> data;
   final String title;
 
   const GasChart({
@@ -14,199 +15,196 @@ class GasChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('GasChart: Construyendo con ${data.length} puntos de datos');
-
     if (data.isEmpty) {
-      return Container(
-        height: 250,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.show_chart,
-                        size: 48,
-                        color: Color(0xFFE5E7EB),
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        'Sin datos de gas disponibles',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return _buildEmptyState(
+        icon: Icons.air_rounded,
+        message: 'Sin datos de gas disponibles',
+        color: AppTheme.neonGreen,
       );
     }
 
-    // Encontrar valores min y max para el eje Y
-    final values = data.map((e) => e.value).toList();
+    final values = data.map((e) => e.ppm).toList();
     final minValue = values.reduce((a, b) => a < b ? a : b);
     final maxValue = values.reduce((a, b) => a > b ? a : b);
     final padding = (maxValue - minValue) * 0.1;
 
-    return Container(
-      height: 250,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF111827),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: (maxValue - minValue) / 4,
-                    getDrawingHorizontalLine: (value) =>
-                        FlLine(color: Colors.grey.shade200, strokeWidth: 1),
-                  ),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 50,
-                        getTitlesWidget: (value, meta) => Text(
-                          '${value.toInt()}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      ),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 30,
-                        interval: data.length > 12 ? 4 : 2,
-                        getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          if (index >= 0 && index < data.length) {
-                            return Text(
-                              data[index].hour,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF6B7280),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  minX: 0,
-                  maxX: (data.length - 1).toDouble(),
-                  minY: minValue - padding,
-                  maxY: maxValue + padding,
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: data.asMap().entries.map((entry) {
-                        return FlSpot(entry.key.toDouble(), entry.value.value);
-                      }).toList(),
-                      isCurved: true,
-                      curveSmoothness: 0.3,
-                      color: const Color(0xFF10B981),
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (spot, percent, barData, index) =>
-                            FlDotCirclePainter(
-                              radius: 4,
-                              color: const Color(0xFF10B981),
-                              strokeWidth: 2,
-                              strokeColor: Colors.white,
-                            ),
-                      ),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF10B981).withOpacity(0.3),
-                            const Color(0xFF10B981).withOpacity(0.05),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildChartHeader(
+          icon: Icons.air_rounded,
+          title: title,
+          count: data.length,
+          color: AppTheme.neonGreen,
+        ),
+        const SizedBox(height: AppTheme.spaceMedium),
+        SizedBox(
+          height: 200,
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: (maxValue - minValue) / 4,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: AppTheme.greyMedium.withOpacity(0.2),
+                  strokeWidth: 1,
                 ),
               ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 45,
+                    getTitlesWidget: (value, meta) => Text(
+                      '${value.toInt()}',
+                      style: AppTheme.caption.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: data.length > 20 ? 10 : 5,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index >= 0 && index < data.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            data[index].timestamp.substring(11, 16),
+                            style: AppTheme.caption.copyWith(
+                              fontSize: 9,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        );
+                      }
+                      return const Text('');
+                    },
+                  ),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              minX: 0,
+              maxX: (data.length - 1).toDouble(),
+              minY: minValue - padding,
+              maxY: maxValue + padding,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: data.asMap().entries.map((entry) {
+                    return FlSpot(entry.key.toDouble(), entry.value.ppm);
+                  }).toList(),
+                  isCurved: true,
+                  curveSmoothness: 0.35,
+                  color: AppTheme.neonGreen,
+                  barWidth: 3,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) =>
+                        FlDotCirclePainter(
+                          radius: 3,
+                          color: AppTheme.neonGreen,
+                          strokeWidth: 2,
+                          strokeColor: AppTheme.backgroundCard,
+                        ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.neonGreen.withOpacity(0.3),
+                        AppTheme.neonGreen.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  shadow: Shadow(
+                    color: AppTheme.neonGreen.withOpacity(0.5),
+                    blurRadius: 8,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String message,
+    required Color color,
+  }) {
+    return SizedBox(
+      height: 250,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: AppTheme.greyMedium),
+          const SizedBox(height: 12),
+          Text(message, style: AppTheme.bodyMedium),
+        ],
       ),
+    );
+  }
+
+  Widget _buildChartHeader({
+    required IconData icon,
+    required String title,
+    required int count,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+            boxShadow: AppTheme.neonShadow(color, blur: 10),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Text(title, style: AppTheme.headingSmall),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
+            ),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+            border: Border.all(color: color.withOpacity(0.3), width: 1),
+          ),
+          child: Text(
+            '$count datos',
+            style: AppTheme.caption.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
 class SeismicChart extends StatelessWidget {
-  final List<ChartDataPoint> data;
+  final List<SeismicDataPoint> data;
   final String title;
 
   const SeismicChart({
@@ -217,189 +215,190 @@ class SeismicChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('SeismicChart: Construyendo con ${data.length} puntos de datos');
-
     if (data.isEmpty) {
-      return Container(
-        height: 250,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.vibration, size: 48, color: Color(0xFFE5E7EB)),
-                      SizedBox(height: 12),
-                      Text(
-                        'Sin datos sísmicos disponibles',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return _buildEmptyState(
+        icon: Icons.vibration_rounded,
+        message: 'Sin datos sísmicos disponibles',
+        color: AppTheme.neonYellow,
       );
     }
 
-    // Encontrar valores min y max para el eje Y
-    final values = data.map((e) => e.value).toList();
+    final values = data.map((e) => e.intensityG).toList();
     final minValue = values.reduce((a, b) => a < b ? a : b);
     final maxValue = values.reduce((a, b) => a > b ? a : b);
     final padding = (maxValue - minValue) * 0.1;
 
-    return Container(
-      height: 250,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF111827),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: (maxValue - minValue) / 4,
-                    getDrawingHorizontalLine: (value) =>
-                        FlLine(color: Colors.grey.shade200, strokeWidth: 1),
-                  ),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 50,
-                        getTitlesWidget: (value, meta) => Text(
-                          value.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      ),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 30,
-                        interval: data.length > 12 ? 4 : 2,
-                        getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          if (index >= 0 && index < data.length) {
-                            return Text(
-                              data[index].hour,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF6B7280),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  minX: 0,
-                  maxX: (data.length - 1).toDouble(),
-                  minY: minValue - padding,
-                  maxY: maxValue + padding,
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: data.asMap().entries.map((entry) {
-                        return FlSpot(entry.key.toDouble(), entry.value.value);
-                      }).toList(),
-                      isCurved: true,
-                      curveSmoothness: 0.3,
-                      color: const Color(0xFFF59E0B),
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (spot, percent, barData, index) =>
-                            FlDotCirclePainter(
-                              radius: 4,
-                              color: const Color(0xFFF59E0B),
-                              strokeWidth: 2,
-                              strokeColor: Colors.white,
-                            ),
-                      ),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFFF59E0B).withOpacity(0.3),
-                            const Color(0xFFF59E0B).withOpacity(0.05),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildChartHeader(
+          icon: Icons.vibration_rounded,
+          title: title,
+          count: data.length,
+          color: AppTheme.neonYellow,
+        ),
+        const SizedBox(height: AppTheme.spaceMedium),
+        SizedBox(
+          height: 200,
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: (maxValue - minValue) / 4,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: AppTheme.greyMedium.withOpacity(0.2),
+                  strokeWidth: 1,
                 ),
               ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 45,
+                    getTitlesWidget: (value, meta) => Text(
+                      value.toStringAsFixed(1),
+                      style: AppTheme.caption.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: data.length > 12 ? 2 : 1,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index >= 0 && index < data.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            data[index].timestamp.substring(11, 16),
+                            style: AppTheme.caption.copyWith(
+                              fontSize: 9,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        );
+                      }
+                      return const Text('');
+                    },
+                  ),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              minX: 0,
+              maxX: (data.length - 1).toDouble(),
+              minY: minValue - padding,
+              maxY: maxValue + padding,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: data.asMap().entries.map((entry) {
+                    return FlSpot(entry.key.toDouble(), entry.value.intensityG);
+                  }).toList(),
+                  isCurved: true,
+                  curveSmoothness: 0.35,
+                  color: AppTheme.neonYellow,
+                  barWidth: 3,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) =>
+                        FlDotCirclePainter(
+                          radius: 3,
+                          color: AppTheme.neonYellow,
+                          strokeWidth: 2,
+                          strokeColor: AppTheme.backgroundCard,
+                        ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.neonYellow.withOpacity(0.3),
+                        AppTheme.neonYellow.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  shadow: Shadow(
+                    color: AppTheme.neonYellow.withOpacity(0.5),
+                    blurRadius: 8,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String message,
+    required Color color,
+  }) {
+    return SizedBox(
+      height: 250,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: AppTheme.greyMedium),
+          const SizedBox(height: 12),
+          Text(message, style: AppTheme.bodyMedium),
+        ],
       ),
+    );
+  }
+
+  Widget _buildChartHeader({
+    required IconData icon,
+    required String title,
+    required int count,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+            boxShadow: AppTheme.neonShadow(color, blur: 10),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Text(title, style: AppTheme.headingSmall),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
+            ),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+            border: Border.all(color: color.withOpacity(0.3), width: 1),
+          ),
+          child: Text(
+            '$count datos',
+            style: AppTheme.caption.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -411,224 +410,189 @@ class AlertsChart extends StatelessWidget {
   const AlertsChart({
     super.key,
     required this.data,
-    this.title = 'Alertas por Tipo (24h)',
+    this.title = 'Distribución de Alertas',
   });
 
   @override
   Widget build(BuildContext context) {
-    print('AlertsChart: Construyendo con ${data.length} alertas');
-
     if (data.isEmpty) {
-      return Container(
+      return SizedBox(
         height: 300,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.notifications_none_rounded,
+              size: 48,
+              color: AppTheme.greyMedium,
             ),
+            const SizedBox(height: 12),
+            Text('Sin alertas registradas', style: AppTheme.bodyMedium),
           ],
-        ),
-        child: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.notifications_none_rounded,
-                size: 48,
-                color: Color(0xFFE5E7EB),
-              ),
-              SizedBox(height: 12),
-              Text(
-                'Sin alertas registradas',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF6B7280),
-                ),
-              ),
-            ],
-          ),
         ),
       );
     }
 
     final colors = [
-      const Color(0xFFEF4444), // Rojo
-      const Color(0xFFF59E0B), // Naranja
-      const Color(0xFF10B981), // Verde
-      const Color(0xFF3B82F6), // Azul
-      const Color(0xFF8B5CF6), // Púrpura
+      AppTheme.neonOrange,
+      AppTheme.error,
+      AppTheme.neonYellow,
+      AppTheme.neonCyan,
+      AppTheme.primaryPurple,
     ];
 
     final totalAlerts = data.fold(0, (sum, alert) => sum + alert.count);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF111827),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Total: $totalAlerts',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF374151),
-                    ),
-                  ),
-                ),
-              ],
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.neonPink.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                boxShadow: AppTheme.neonShadow(AppTheme.neonPink, blur: 10),
+              ),
+              child: Icon(
+                Icons.pie_chart_rounded,
+                color: AppTheme.neonPink,
+                size: 18,
+              ),
             ),
-            const SizedBox(height: 20),
-
-            // Gráfico de pie
-            Center(
-              child: SizedBox(
-                width: 180,
-                height: 180,
-                child: PieChart(
-                  PieChartData(
-                    sections: data.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final alert = entry.value;
-                      final color = colors[index % colors.length];
-                      final percentage = (alert.count / totalAlerts * 100)
-                          .round();
-
-                      return PieChartSectionData(
-                        color: color,
-                        value: alert.count.toDouble(),
-                        title: '$percentage%',
-                        radius: 60,
-                        titleStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                        titlePositionPercentageOffset: 0.6,
-                      );
-                    }).toList(),
-                    centerSpaceRadius: 45,
-                    sectionsSpace: 2,
-                    startDegreeOffset: -90,
-                  ),
+            const SizedBox(width: 12),
+            Text(title, style: AppTheme.headingSmall),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryPurple.withOpacity(0.2),
+                    AppTheme.primaryPurple.withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                border: Border.all(
+                  color: AppTheme.primaryPurple.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                'Total: $totalAlerts',
+                style: AppTheme.caption.copyWith(
+                  color: AppTheme.primaryPurple,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.spaceLarge),
+        Center(
+          child: SizedBox(
+            width: 180,
+            height: 180,
+            child: PieChart(
+              PieChartData(
+                sections: data.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final alert = entry.value;
+                  final color = colors[index % colors.length];
+                  final percentage = (alert.count / totalAlerts * 100).round();
 
-            const SizedBox(height: 20),
+                  return PieChartSectionData(
+                    color: color,
+                    value: alert.count.toDouble(),
+                    title: '$percentage%',
+                    radius: 60,
+                    titleStyle: AppTheme.bodySmall.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.backgroundDark,
+                    ),
+                    titlePositionPercentageOffset: 0.6,
+                  );
+                }).toList(),
+                centerSpaceRadius: 50,
+                sectionsSpace: 3,
+                startDegreeOffset: -90,
+                borderData: FlBorderData(show: false),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppTheme.spaceLarge),
+        ...data.asMap().entries.map((entry) {
+          final index = entry.key;
+          final alert = entry.value;
+          final color = colors[index % colors.length];
+          final percentage = (alert.count / totalAlerts * 100).round();
 
-            // Lista de leyendas
-            ...data.asMap().entries.map((entry) {
-              final index = entry.key;
-              final alert = entry.value;
-              final color = colors[index % colors.length];
-              final percentage = (alert.count / totalAlerts * 100).round();
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+          return Container(
+            margin: const EdgeInsets.only(bottom: AppTheme.spaceSmall),
+            padding: const EdgeInsets.all(AppTheme.spaceMedium),
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundElevated.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+              border: Border.all(color: color.withOpacity(0.3), width: 1),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: AppTheme.neonShadow(color, blur: 8),
+                  ),
                 ),
-                child: Row(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        alert.description,
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        alert.code,
+                        style: AppTheme.caption.copyWith(
+                          color: AppTheme.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
+                    Text(
+                      '${alert.count}',
+                      style: AppTheme.headingSmall.copyWith(
+                        fontSize: 18,
                         color: color,
-                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            alert.description,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF374151),
-                            ),
-                          ),
-                          Text(
-                            alert.code,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                        ],
+                    Text(
+                      '$percentage%',
+                      style: AppTheme.caption.copyWith(
+                        color: AppTheme.textSecondary,
                       ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${alert.count}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: color,
-                          ),
-                        ),
-                        Text(
-                          '$percentage%',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              );
-            }),
-          ],
-        ),
-      ),
+              ],
+            ),
+          );
+        }),
+      ],
     );
   }
 }

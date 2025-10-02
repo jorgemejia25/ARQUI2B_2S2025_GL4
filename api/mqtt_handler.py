@@ -280,11 +280,11 @@ class MQTTHandler:
                     
                     # Procesar semáforos
                     if "semaforos" in payload:
-                        logger.info(f"Procesando {len(payload['semaforos'])} semáforos...")
-                        for semaforo in payload["semaforos"]:
-                            estado = semaforo.get("estado", "UNKNOWN")
-                            semaforo_id = semaforo["id"]
-                            
+                        semaforos_data = payload["semaforos"]
+                        logger.info(f"Procesando {len(semaforos_data)} semáforos...")
+                        
+                        # Los semáforos vienen como diccionario {id: estado}
+                        for semaforo_id, estado in semaforos_data.items():
                             logger.info(f"Semáforo {semaforo_id} en estado {estado} - emitiendo actualización de tráfico")
                             
                             # Mapear estados del Arduino a colores estándar

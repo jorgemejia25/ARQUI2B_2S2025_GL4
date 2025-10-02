@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../layouts/main_layout.dart';
-import '../widgets/alert_feed.dart';
+import '../layouts/modern_layout.dart';
+import '../widgets/alert_feed_fixed.dart';
 import '../services/websocket_alerts.dart';
+import '../config/app_theme.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -40,7 +41,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _showSnack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: AppTheme.bodyMedium.copyWith(color: Colors.white),
+        ),
+        backgroundColor: AppTheme.backgroundCard,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        ),
+        margin: const EdgeInsets.all(AppTheme.spaceMedium),
+      ),
+    );
   }
 
   Future<void> _pullToRefresh() async {
@@ -52,24 +66,49 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return MainLayout(
+    return ModernLayout(
       title: 'Notificaciones',
+      currentRoute: '/notifications',
       child: Stack(
         children: [
+          // Contenido principal con RefreshIndicator
           RefreshIndicator(
             onRefresh: _pullToRefresh,
-            child: const AlertsFeed(),
+            color: AppTheme.primaryPurple,
+            backgroundColor: AppTheme.backgroundCard,
+            child: const AlertsFeedFixed(),
           ),
 
-          // FAB para forzar pruebas locales de UI (opcional en debug)
+          // FAB moderno para simular alertas
           Positioned(
-            right: 16,
-            bottom: 16,
-            child: FloatingActionButton.extended(
-              heroTag: 'fabSimAlert',
-              onPressed: _ws.simulateAlertMessage,
-              icon: const Icon(Icons.bolt),
-              label: const Text('Simular alerta'),
+            right: AppTheme.spaceMedium,
+            bottom: AppTheme.spaceMedium,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: AppTheme.purpleGradient,
+                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryPurple.withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: FloatingActionButton.extended(
+                heroTag: 'fabSimAlert',
+                onPressed: _ws.simulateAlertMessage,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                icon: const Icon(Icons.flash_on_rounded, color: Colors.white),
+                label: Text(
+                  'Simular Alerta',
+                  style: AppTheme.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
           ),
         ],

@@ -1,18 +1,5 @@
-# Dependencias para el módulo de comunicación serial con Arduino
-# Instalar con: pip install -r requirements.txt
-
-# Biblioteca para comunicación serial
+paho-mqtt>=1.6.1
 pyserial>=3.5
-
-# Biblioteca para manejo de variables de entorno
 python-dotenv>=1.0.0
-
-# Biblioteca para comunicación MQTT
-paho-mqtt>=1.6.0
-
-# Para desarrollo y testing (opcional)
-# pytest>=7.0.0
-# pytest-cov>=4.0.0
-# black>=22.0.0
-# flake8>=5.0.0
-
+pydantic>=2.5.0
+pydantic-settings>=2.1.0

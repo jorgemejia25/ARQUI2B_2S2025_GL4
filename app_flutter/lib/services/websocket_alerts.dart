@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/websocket_message.dart'; // reutiliza AlertData, AlertMessage, AlertType
+import '../config/api_config.dart';
 
 class WebSocketAlertsService {
   static WebSocketAlertsService? _instance;
@@ -20,23 +21,22 @@ class WebSocketAlertsService {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
   bool _isConnected = false;
-  final String _url =
-      'wss://arqui2b2s2025gl4-production.up.railway.app/ws/alerts';
+  final String _url = ApiConfig.wsAlertsUrl;
 
   // Buffer + stream para el feed
   final List<AlertData> _recentAlerts = [];
-  static const int _maxAlertsBuffer = 50;
+  static const int _maxAlertsBuffer = ApiConfig.maxAlertsBuffer;
   final StreamController<List<AlertData>> _alertsController =
       StreamController<List<AlertData>>.broadcast();
 
   // Rate limiting para evitar spam de alertas
   final Map<String, DateTime> _lastAlertTime = {};
-  static const Duration _minAlertInterval = Duration(seconds: 30);
+  static const Duration _minAlertInterval = ApiConfig.minAlertInterval;
 
   // Umbrales para alertas de gas (valores en ppm o porcentaje)
-  static const double _gasThresholdLow = 50.0; // Umbral bajo
-  static const double _gasThresholdMedium = 100.0; // Umbral medio
-  static const double _gasThresholdHigh = 200.0; // Umbral alto
+  static const double _gasThresholdLow = ApiConfig.gasThresholdLow;
+  static const double _gasThresholdMedium = ApiConfig.gasThresholdMedium;
+  static const double _gasThresholdHigh = ApiConfig.gasThresholdHigh;
 
   // Callbacks opcionales
   Function(AlertData)? onAlert;
@@ -101,6 +101,12 @@ class WebSocketAlertsService {
           messageType == 'infraction') {
         _handleAlertMessage(jsonData);
       }
+
+      // También procesar mensajes directos del backend que no tienen 'type'
+      // pero sí tienen 'alert_type' en el nivel raíz
+      if (jsonData.containsKey('alert_type') && !jsonData.containsKey('type')) {
+        _handleDirectAlertMessage(jsonData);
+      }
     } catch (e) {
       onError?.call('Error procesando alerta: $e');
     }
@@ -126,13 +132,7 @@ class WebSocketAlertsService {
     final String? typeFromMsg = jsonData['type'] as String?;
     if (typeFromMsg == 'gas_alert' && !_isValidGasAlert(root)) {
       // Alerta de gas no válida, no la procesamos
-      print('❌ [WEBSOCKET-ALERTS] Alerta de gas inválida rechazada');
       return;
-    }
-
-    // Las infracciones de tráfico SIEMPRE deben procesarse
-    if (typeFromMsg == 'traffic_violation' || typeFromMsg == 'infraction') {
-      print('🚨 [WEBSOCKET-ALERTS] Procesando infracción de tráfico...');
     }
 
     AlertData alert;
@@ -154,6 +154,39 @@ class WebSocketAlertsService {
         ts: ts ?? (DateTime.now().millisecondsSinceEpoch / 1000.0), // ➕
       );
     }
+
+    // Aplicar rate limiting
+    if (!_shouldShowAlert(alert)) {
+      return;
+    }
+
+    _pushAlert(alert);
+  }
+
+  void _handleDirectAlertMessage(Map<String, dynamic> jsonData) {
+    // Procesar mensajes directos del backend que tienen alert_type en el nivel raíz
+    final Map<String, dynamic> root = Map<String, dynamic>.from(jsonData);
+
+    // Pasa el timestamp de mensaje como 'ts' (epoch segs)
+    final double? ts = (jsonData['timestamp'] as num?)?.toDouble();
+    if (ts != null) root['ts'] = ts;
+
+    // Si hay datos anidados en 'data', extraerlos y combinarlos
+    final Map<String, dynamic>? nestedData =
+        jsonData['data'] as Map<String, dynamic>?;
+    if (nestedData != null) {
+      // Combinar datos anidados con los datos raíz
+      root.addAll(nestedData);
+    }
+
+    // Validar si es una alerta de gas antes de procesarla
+    final String? alertType = jsonData['alert_type'] as String?;
+    if (alertType == 'GAS_ALERT' && !_isValidGasAlert(root)) {
+      // Alerta de gas no válida, no la procesamos
+      return;
+    }
+
+    AlertData alert = AlertData.fromJson(root);
 
     // Aplicar rate limiting
     if (!_shouldShowAlert(alert)) {
@@ -191,15 +224,6 @@ class WebSocketAlertsService {
   }
 
   void _pushAlert(AlertData alert) {
-    // Log específico para infracciones
-    if (alert.alertType.toLowerCase().contains('infrac')) {
-      print('🚨 [FLUTTER] INFRACCIÓN RECIBIDA: ${alert.alertType}');
-      print('   - Semáforo: ${alert.signalId ?? "N/A"}');
-      print('   - Color: ${alert.signalColor ?? "N/A"}');
-      print('   - Severidad: ${alert.severity}');
-      print('   - Origen: ${alert.origen ?? "N/A"}');
-    }
-
     _recentAlerts.add(alert);
     if (_recentAlerts.length > _maxAlertsBuffer) {
       _recentAlerts.removeAt(0);
@@ -251,16 +275,10 @@ class WebSocketAlertsService {
 
   // Simulador específico para infracciones desde el servicio de tráfico
   void simulateInfractionMessage(Map<String, dynamic> infractionData) {
-    print(
-      '🔄 [WEBSOCKET-ALERTS] Procesando infracción recibida desde tráfico:',
-    );
-    print('   - Datos: ${json.encode(infractionData)}');
-
     try {
       _handleMessage(json.encode(infractionData));
-      print('✅ [WEBSOCKET-ALERTS] Infracción procesada y agregada al feed');
     } catch (e) {
-      print('❌ [WEBSOCKET-ALERTS] Error procesando infracción: $e');
+      // Error silencioso
     }
   }
 

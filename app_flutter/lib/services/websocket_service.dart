@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/websocket_message.dart';
 import '../models/traffic_light.dart';
+import '../config/api_config.dart';
 import 'websocket_alerts.dart';
 
 class WebSocketService {
@@ -14,10 +15,10 @@ class WebSocketService {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
   bool _isConnected = false;
-  String _url = 'wss://arqui2b2s2025gl4-production.up.railway.app/ws/traffic';
+  String _url = ApiConfig.wsTrafficUrl;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 5;
+  static const int _maxReconnectAttempts = ApiConfig.maxReconnectAttempts;
 
   // Callbacks para manejar los mensajes
   Function(WebSocketMessage)? onTrafficUpdate;
@@ -72,7 +73,7 @@ class WebSocketService {
       _reconnectAttempts = 0;
       onDisconnected?.call();
     } catch (e) {
-      print('Error desconectando WebSocket: $e');
+      // Error silencioso
     }
   }
 
@@ -136,25 +137,14 @@ class WebSocketService {
         ? 4
         : 1; // Alta severidad para infracciones
 
-    print('🚦 [WEBSOCKET-TRAFFIC] Mensaje recibido:');
-    print('   - Signal ID: $signalId');
-    print('   - Signal Color: $signalColor');
-    print('   - Violation Type: $violationType');
-    print('   - Alert Type: $alertType');
-    print('   - Severity: $severity');
-
     // SI ES UNA INFRACCIÓN, también enviarla al canal de alertas
     if (violationType == 'red_light') {
-      print(
-        '🚨 [WEBSOCKET-TRAFFIC] ¡INFRACCIÓN DETECTADA! Enviando a alertas...',
-      );
       _forwardInfractionToAlertsService(signalId, signalColor, fullMessage);
     }
 
     // Mapear el ID del semáforo del WebSocket al ID del SVG
     final svgId = _mapSignalIdToSvgId(signalId);
     if (svgId == null) {
-      print('❌ [WEBSOCKET-TRAFFIC] ID no válido para SVG: $signalId');
       return;
     }
 
@@ -162,7 +152,6 @@ class WebSocketService {
     final trafficState = _mapColorToTrafficState(signalColor);
 
     if (trafficState == null) {
-      print('❌ [WEBSOCKET-TRAFFIC] Color no válido: $signalColor');
       return;
     }
 
@@ -184,7 +173,6 @@ class WebSocketService {
       ),
     );
 
-    print('✅ [WEBSOCKET-TRAFFIC] Enviando actualización al mapa');
     onTrafficUpdate?.call(simplifiedMessage);
   }
 
@@ -249,11 +237,9 @@ class WebSocketService {
   /// Manejar errores
   void _handleError(dynamic error) {
     _isConnected = false;
-    print('WebSocket Error: $error');
 
     // Manejar diferentes tipos de errores
     if (error.toString().contains('SocketException')) {
-      print('SocketException detectada - intentando reconectar...');
       _scheduleReconnect();
     } else {
       onError?.call('Error en WebSocket: $error');
@@ -263,7 +249,6 @@ class WebSocketService {
   /// Manejar desconexión
   void _handleDisconnection() {
     _isConnected = false;
-    print('WebSocket desconectado - intentando reconectar...');
     _scheduleReconnect();
     onDisconnected?.call();
   }
@@ -365,22 +350,16 @@ class WebSocketService {
         },
       };
 
-      print('📡 [WEBSOCKET-TRAFFIC] Reenviando infracción a alertas:');
-      print('   - Mensaje: ${json.encode(infractionAlert)}');
-
       // Simular llegada del mensaje al servicio de alertas
       alertsService.simulateInfractionMessage(infractionAlert);
-
-      print('✅ [WEBSOCKET-TRAFFIC] Infracción enviada a alertas exitosamente');
     } catch (e) {
-      print('❌ [WEBSOCKET-TRAFFIC] Error enviando infracción a alertas: $e');
+      // Error silencioso
     }
   }
 
   /// Programar reconexión automática con backoff exponencial
   void _scheduleReconnect() {
     if (_reconnectAttempts >= _maxReconnectAttempts) {
-      print('Máximo número de intentos de reconexión alcanzado');
       onError?.call(
         'No se pudo reconectar después de $_maxReconnectAttempts intentos',
       );
@@ -391,9 +370,8 @@ class WebSocketService {
     _reconnectAttempts++;
 
     // Backoff exponencial: 2, 4, 8, 16, 32 segundos
-    final delay = Duration(seconds: 2 * _reconnectAttempts);
-    print(
-      'Reconectando en ${delay.inSeconds} segundos (intento $_reconnectAttempts/$_maxReconnectAttempts)',
+    final delay = Duration(
+      seconds: ApiConfig.reconnectDelay.inSeconds * _reconnectAttempts,
     );
 
     _reconnectTimer = Timer(delay, () async {
@@ -401,10 +379,8 @@ class WebSocketService {
         await connect();
         if (_isConnected) {
           _reconnectAttempts = 0; // Resetear contador en conexión exitosa
-          print('Reconexión exitosa');
         }
       } catch (e) {
-        print('Error en reconexión: $e');
         _scheduleReconnect(); // Intentar de nuevo
       }
     });

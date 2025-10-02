@@ -1,7 +1,7 @@
 import 'package:go_router/go_router.dart';
 import '../screens/intro_screen.dart';
 import '../screens/home_screen.dart';
-import '../screens/dashboard_screen.dart';
+import '../screens/professional_dashboard_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/qr_scanner_screen.dart';
@@ -56,14 +56,14 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const HomeScreen(),
     ),
 
-    /// Ruta del dashboard.
+    /// Ruta del dashboard profesional.
     ///
-    /// Pantalla del panel de control principal donde los usuarios pueden
-    /// gestionar y monitorear el sistema de tráfico.
+    /// Pantalla del panel de control avanzado con análisis en tiempo real,
+    /// filtros personalizados y gráficas profesionales.
     GoRoute(
       path: '/dashboard',
       name: 'dashboard',
-      builder: (context, state) => const DashboardScreen(),
+      builder: (context, state) => const ProfessionalDashboardScreen(),
     ),
 
     /// Ruta de notificaciones.

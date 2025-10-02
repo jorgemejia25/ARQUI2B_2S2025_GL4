@@ -1,40 +1,36 @@
 class DashboardSummary {
-  final List<AlertSummary> alertsSummary;
-  final List<BusStatus> busesStatus;
-  final List<GasMeasurement> latestGas;
-  final List<SeismicMeasurement> latestSeismic;
+  final int totalAlerts;
+  final int recentAlerts24h;
+  final int totalBuses;
+  final int totalRoutes;
+  final List<AlertSummary> alertsByType;
+  final LastAlert? lastAlert;
   final String timestamp;
 
   DashboardSummary({
-    required this.alertsSummary,
-    required this.busesStatus,
-    required this.latestGas,
-    required this.latestSeismic,
+    required this.totalAlerts,
+    required this.recentAlerts24h,
+    required this.totalBuses,
+    required this.totalRoutes,
+    required this.alertsByType,
+    this.lastAlert,
     required this.timestamp,
   });
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
     return DashboardSummary(
-      alertsSummary:
-          (json['alerts_summary'] as List?)
+      totalAlerts: json['total_alerts'] ?? 0,
+      recentAlerts24h: json['recent_alerts_24h'] ?? 0,
+      totalBuses: json['total_buses'] ?? 0,
+      totalRoutes: json['total_routes'] ?? 0,
+      alertsByType:
+          (json['alerts_by_type'] as List?)
               ?.map((e) => AlertSummary.fromJson(e))
               .toList() ??
           [],
-      busesStatus:
-          (json['buses_status'] as List?)
-              ?.map((e) => BusStatus.fromJson(e))
-              .toList() ??
-          [],
-      latestGas:
-          (json['latest_gas'] as List?)
-              ?.map((e) => GasMeasurement.fromJson(e))
-              .toList() ??
-          [],
-      latestSeismic:
-          (json['latest_seismic'] as List?)
-              ?.map((e) => SeismicMeasurement.fromJson(e))
-              .toList() ??
-          [],
+      lastAlert: json['last_alert'] != null
+          ? LastAlert.fromJson(json['last_alert'])
+          : null,
       timestamp: json['timestamp'] ?? '',
     );
   }
@@ -56,6 +52,32 @@ class AlertSummary {
       code: json['code'] ?? '',
       description: json['description'] ?? '',
       count: json['count'] ?? 0,
+    );
+  }
+}
+
+class LastAlert {
+  final int alertId;
+  final String ts;
+  final String code;
+  final String description;
+  final int severity;
+
+  LastAlert({
+    required this.alertId,
+    required this.ts,
+    required this.code,
+    required this.description,
+    required this.severity,
+  });
+
+  factory LastAlert.fromJson(Map<String, dynamic> json) {
+    return LastAlert(
+      alertId: json['alert_id'] ?? 0,
+      ts: json['ts'] ?? '',
+      code: json['code'] ?? '',
+      description: json['description'] ?? '',
+      severity: json['severity'] ?? 0,
     );
   }
 }
@@ -126,75 +148,165 @@ class ChartDataPoint {
 }
 
 class GasChartData {
-  final List<ChartDataPoint> data;
+  final int hours;
+  final List<GasDataPoint> data;
+  final int count;
 
-  GasChartData({required this.data});
+  GasChartData({required this.hours, required this.data, required this.count});
 
   factory GasChartData.fromJson(Map<String, dynamic> json) {
     return GasChartData(
+      hours: json['hours'] ?? 24,
       data:
-          (json['gas_by_hour'] as List?)
-              ?.map(
-                (e) => ChartDataPoint.fromJson({
-                  'hour': e['hour'],
-                  'value': e['avg_ppm'],
-                }),
-              )
+          (json['data'] as List?)
+              ?.map((e) => GasDataPoint.fromJson(e))
               .toList() ??
           [],
+      count: json['count'] ?? 0,
+    );
+  }
+}
+
+class GasDataPoint {
+  final int id;
+  final String timestamp;
+  final double ppm;
+
+  GasDataPoint({required this.id, required this.timestamp, required this.ppm});
+
+  factory GasDataPoint.fromJson(Map<String, dynamic> json) {
+    return GasDataPoint(
+      id: json['id'] ?? 0,
+      timestamp: json['timestamp'] ?? '',
+      ppm: json['ppm']?.toDouble() ?? 0.0,
     );
   }
 }
 
 class SeismicChartData {
-  final List<ChartDataPoint> data;
+  final int hours;
+  final List<SeismicDataPoint> data;
+  final int count;
 
-  SeismicChartData({required this.data});
+  SeismicChartData({
+    required this.hours,
+    required this.data,
+    required this.count,
+  });
 
   factory SeismicChartData.fromJson(Map<String, dynamic> json) {
     return SeismicChartData(
+      hours: json['hours'] ?? 24,
       data:
-          (json['seismic_by_hour'] as List?)
-              ?.map(
-                (e) => ChartDataPoint.fromJson({
-                  'hour': e['hour'],
-                  'value': e['avg_intensity'],
-                }),
-              )
+          (json['data'] as List?)
+              ?.map((e) => SeismicDataPoint.fromJson(e))
               .toList() ??
           [],
+      count: json['count'] ?? 0,
+    );
+  }
+}
+
+class SeismicDataPoint {
+  final int id;
+  final String timestamp;
+  final double intensityG;
+
+  SeismicDataPoint({
+    required this.id,
+    required this.timestamp,
+    required this.intensityG,
+  });
+
+  factory SeismicDataPoint.fromJson(Map<String, dynamic> json) {
+    return SeismicDataPoint(
+      id: json['id'] ?? 0,
+      timestamp: json['timestamp'] ?? '',
+      intensityG: json['intensity_g']?.toDouble() ?? 0.0,
     );
   }
 }
 
 class DashboardMetrics {
-  final List<TableCount> tableCounts;
-  final List<SeverityDistribution> severityDistribution;
-  final List<HourlyActivity> hourlyActivity;
+  final double avgSeverity;
+  final List<HourlyAlert> alertsPerHour;
+  final EventsByType eventsByType;
+  final List<TopStop> topStopsWithAlerts;
+  final String timestamp;
 
   DashboardMetrics({
-    required this.tableCounts,
-    required this.severityDistribution,
-    required this.hourlyActivity,
+    required this.avgSeverity,
+    required this.alertsPerHour,
+    required this.eventsByType,
+    required this.topStopsWithAlerts,
+    required this.timestamp,
   });
 
   factory DashboardMetrics.fromJson(Map<String, dynamic> json) {
     return DashboardMetrics(
-      tableCounts:
-          (json['table_counts'] as List?)
-              ?.map((e) => TableCount.fromJson(e))
+      avgSeverity: json['avg_severity']?.toDouble() ?? 0.0,
+      alertsPerHour:
+          (json['alerts_per_hour'] as List?)
+              ?.map((e) => HourlyAlert.fromJson(e))
               .toList() ??
           [],
-      severityDistribution:
-          (json['severity_distribution'] as List?)
-              ?.map((e) => SeverityDistribution.fromJson(e))
+      eventsByType: json['events_by_type'] != null
+          ? EventsByType.fromJson(json['events_by_type'])
+          : EventsByType(),
+      topStopsWithAlerts:
+          (json['top_stops_with_alerts'] as List?)
+              ?.map((e) => TopStop.fromJson(e))
               .toList() ??
           [],
-      hourlyActivity:
-          (json['hourly_activity'] as List?)
-              ?.map((e) => HourlyActivity.fromJson(e))
-              .toList() ??
-          [],
+      timestamp: json['timestamp'] ?? '',
+    );
+  }
+}
+
+class HourlyAlert {
+  final int count;
+  final String hour;
+
+  HourlyAlert({required this.count, required this.hour});
+
+  factory HourlyAlert.fromJson(Map<String, dynamic> json) {
+    return HourlyAlert(count: json['count'] ?? 0, hour: json['hour'] ?? '');
+  }
+}
+
+class EventsByType {
+  final int trafficInfractions;
+  final int panicEvents;
+  final int seismicEvents;
+  final int gasEvents;
+
+  EventsByType({
+    this.trafficInfractions = 0,
+    this.panicEvents = 0,
+    this.seismicEvents = 0,
+    this.gasEvents = 0,
+  });
+
+  factory EventsByType.fromJson(Map<String, dynamic> json) {
+    return EventsByType(
+      trafficInfractions: json['traffic_infractions'] ?? 0,
+      panicEvents: json['panic_events'] ?? 0,
+      seismicEvents: json['seismic_events'] ?? 0,
+      gasEvents: json['gas_events'] ?? 0,
+    );
+  }
+}
+
+class TopStop {
+  final String stopName;
+  final int alertCount;
+
+  TopStop({required this.stopName, required this.alertCount});
+
+  factory TopStop.fromJson(Map<String, dynamic> json) {
+    return TopStop(
+      stopName: json['stop_name'] ?? '',
+      alertCount: json['alert_count'] ?? 0,
     );
   }
 }

@@ -71,6 +71,11 @@ class AlertData {
   // en segundos (double)
   final double? ts;
 
+  // Campos específicos para alertas sísmicas
+  final double? seismicIntensity;
+  final double? thresholdG;
+  final bool? tieneSismo;
+
   AlertData({
     required this.alertType,
     this.signalId,
@@ -81,6 +86,9 @@ class AlertData {
     this.origen,
     required this.severity,
     this.ts, // ➕
+    this.seismicIntensity,
+    this.thresholdG,
+    this.tieneSismo,
   });
 
   factory AlertData.fromJson(Map<String, dynamic> json) {
@@ -93,7 +101,10 @@ class AlertData {
       tiempoSegundos: (json['tiempo_segundos'] as num?)?.toInt(),
       origen: json['origen'] as String?,
       severity: (json['severity'] as num).toInt(),
-      ts: (json['ts'] as num?)?.toDouble(), 
+      ts: (json['ts'] as num?)?.toDouble(),
+      seismicIntensity: (json['seismic_intensity'] as num?)?.toDouble(),
+      thresholdG: (json['threshold_g'] as num?)?.toDouble(),
+      tieneSismo: json['tiene_sismo'] as bool?,
     );
   }
 
@@ -108,6 +119,9 @@ class AlertData {
       if (origen != null) 'origen': origen,
       'severity': severity,
       if (ts != null) 'ts': ts,
+      if (seismicIntensity != null) 'seismic_intensity': seismicIntensity,
+      if (thresholdG != null) 'threshold_g': thresholdG,
+      if (tieneSismo != null) 'tiene_sismo': tieneSismo,
     };
   }
 }
@@ -215,14 +229,12 @@ class EtaUpdateData {
   }
 }
 
-
-
 /// Tipos de alerta que puede enviar el backend.
 enum AlertType {
-  infraccion,   // INFRACCION
-  panico,       // PANICO
-  gasAlert,     // GAS_ALERT
-  seismicAlert, // SEISMIC_ALERT
+  infraccion, // INFRACCION
+  panico, // PANICO
+  gasAlert, // GAS_ALERT
+  seismicAlert, // SEISMIC_ALERT, SISMO
   signalUpdate, // SIGNAL_UPDATE (cuando venga como alerta genérica)
   unknown;
 
@@ -235,6 +247,7 @@ enum AlertType {
       case 'GAS_ALERT':
         return AlertType.gasAlert;
       case 'SEISMIC_ALERT':
+      case 'SISMO':
         return AlertType.seismicAlert;
       case 'SIGNAL_UPDATE':
         return AlertType.signalUpdate;
@@ -261,11 +274,10 @@ enum AlertType {
   }
 }
 
-
 /// Mensaje WS para type == "alert"
 class AlertMessage {
-  final String type;        // "alert"
-  final double timestamp;   // epoch en segundos
+  final String type; // "alert"
+  final double timestamp; // epoch en segundos
   final AlertData data;
 
   AlertMessage({
@@ -290,8 +302,9 @@ class AlertMessage {
 
   String get subtitle {
     if (data.signalId != null) return 'Semáforo: ${data.signalId}';
-    if (data.stopId != null)   return 'Parada: ${data.stopId}';
-    if (data.origen != null && data.origen!.isNotEmpty) return 'Origen: ${data.origen}';
+    if (data.stopId != null) return 'Parada: ${data.stopId}';
+    if (data.origen != null && data.origen!.isNotEmpty)
+      return 'Origen: ${data.origen}';
     return '';
   }
 }
@@ -301,18 +314,24 @@ extension AlertDataView on AlertData {
 
   String get title {
     switch (kind) {
-      case AlertType.infraccion:   return 'Infracción de tránsito';
-      case AlertType.panico:       return 'Botón de pánico';
-      case AlertType.gasAlert:     return 'Alerta de gas';
-      case AlertType.seismicAlert: return 'Alerta sísmica';
-      case AlertType.signalUpdate: return 'Actualización de señal';
-      case AlertType.unknown:      return 'Alerta';
+      case AlertType.infraccion:
+        return 'Infracción de tránsito';
+      case AlertType.panico:
+        return 'Botón de pánico';
+      case AlertType.gasAlert:
+        return 'Alerta de gas';
+      case AlertType.seismicAlert:
+        return 'Alerta sísmica';
+      case AlertType.signalUpdate:
+        return 'Actualización de señal';
+      case AlertType.unknown:
+        return 'Alerta';
     }
   }
 
   String get subtitle {
     if (signalId != null) return 'Semáforo: $signalId';
-    if (stopId != null)   return 'Parada: $stopId';
+    if (stopId != null) return 'Parada: $stopId';
     if (origen != null && origen!.isNotEmpty) return 'Origen: $origen';
     return '';
   }

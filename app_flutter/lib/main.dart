@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'routes/app_router.dart';
+import 'config/app_theme.dart';
 
 /// Punto de entrada principal de la aplicación de Gestión de Tráfico.
 ///
@@ -8,60 +10,53 @@ import 'routes/app_router.dart';
 ///
 /// La aplicación se configura con:
 /// - MaterialApp.router para usar go_router
-/// - Tema personalizado con colores de la marca
+/// - Tema oscuro moderno con morado y detalles neón
 /// - Configuración de rutas centralizada
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Configurar la UI del sistema en modo oscuro
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: AppTheme.backgroundDark,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
+
   runApp(const MyApp());
 }
 
 /// Widget raíz de la aplicación que configura el tema y la navegación.
 ///
 /// Este widget es responsable de:
-/// - Configurar el tema de la aplicación
+/// - Configurar el tema oscuro moderno
 /// - Establecer la configuración de navegación
 /// - Definir el comportamiento global de la aplicación
 ///
 /// Características del tema:
-/// - Color principal: Azul oscuro (#1E3A8A)
+/// - Tema oscuro con morado (#8B5CF6) como color principal
+/// - Detalles neón para efectos visuales modernos
 /// - Material Design 3 habilitado
-/// - Fuente Roboto como predeterminada
+/// - Diseño tecnológico e innovador
 class MyApp extends StatelessWidget {
   /// Constructor del widget raíz de la aplicación.
-  ///
-  /// [key] - Clave opcional para el widget.
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
       /// Título de la aplicación que se muestra en el sistema operativo.
-      title: 'Gestión de Tráfico',
+      title: 'Sistema de Seguridad de Tráfico',
 
-      /// Configuración del tema de la aplicación.
-      ///
-      /// Define los colores, tipografías y estilos que se aplicarán
-      /// globalmente en toda la aplicación.
-      theme: ThemeData(
-        /// Esquema de colores generado a partir del color principal.
-        ///
-        /// El color seed se usa para generar automáticamente una paleta
-        /// de colores coherente y accesible.
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1E3A8A),
-          brightness: Brightness.light,
-        ),
+      /// Tema oscuro personalizado con diseño moderno neón.
+      theme: AppTheme.darkTheme,
 
-        /// Habilita Material Design 3 para un diseño más moderno.
-        useMaterial3: true,
-
-        /// Define la fuente predeterminada para toda la aplicación.
-        fontFamily: 'Roboto',
-      ),
+      /// Deshabilitar el banner de debug
+      debugShowCheckedModeBanner: false,
 
       /// Configuración del router para la navegación de la aplicación.
-      ///
-      /// Utiliza go_router para manejar la navegación entre pantallas
-      /// de manera declarativa y eficiente.
       routerConfig: appRouter,
     );
   }

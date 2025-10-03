@@ -11,10 +11,33 @@ from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
 from app.api.endpoints import health, alerts, websockets, dashboard
 from app.api.dependencies import get_mqtt_service, get_websocket_service
+from app.db.connection import DatabaseConnection
 
 # Setup logging
 setup_logging()
 logger = get_logger(__name__)
+
+
+def clear_bus_position_tables():
+    """
+    Clear BusPositionMetro and BusPositionUrban tables on startup
+    This ensures fresh tracking data for each API session
+    """
+    try:
+        # Create database connection using context manager
+        with DatabaseConnection() as db:
+            # Clear BusPositionMetro
+            db.execute_query("DELETE FROM BusPositionMetro")
+            logger.info(f"🧹 Cleared BusPositionMetro table")
+            
+            # Clear BusPositionUrban
+            db.execute_query("DELETE FROM BusPositionUrban")
+            logger.info(f"🧹 Cleared BusPositionUrban table")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error clearing BusPosition tables: {e}")
+        return False
 
 
 @asynccontextmanager
@@ -27,6 +50,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     
     try:
+        # Clear BusPosition tables on startup
+        clear_bus_position_tables()
+        
         # Initialize WebSocket service
         websocket_service = get_websocket_service()
         logger.info("WebSocket service initialized")

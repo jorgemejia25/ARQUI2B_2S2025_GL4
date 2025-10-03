@@ -1,26 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script para iniciar el broker Mosquitto local
-# Proyecto de Seguridad de Tráfico - Arquitectura de Software 2
-
 echo "Iniciando broker Mosquitto local..."
-
-# Crear directorio de datos si no existe
-mkdir -p mosquitto_data
 
 # Intentar encontrar el binario en el PATH (Linux)
 MOSQUITTO_BIN="$(command -v mosquitto || true)"
 
 if [[ -n "${MOSQUITTO_BIN}" ]]; then
-  # Arrancar con configuración personalizada
-  exec "${MOSQUITTO_BIN}" -c mosquitto_local.conf -v
+  # Arrancar en primer plano (útil para ver logs). Cambia puertos si necesitas.
+  exec "${MOSQUITTO_BIN}" -v -p 1883
 else
   # Fallback: rutas típicas de macOS Homebrew (por si corre en Mac)
   if [[ -x "/opt/homebrew/opt/mosquitto/sbin/mosquitto" ]]; then
-    exec /opt/homebrew/opt/mosquitto/sbin/mosquitto -c mosquitto_local.conf -v
+    exec /opt/homebrew/opt/mosquitto/sbin/mosquitto -v -p 1883
   elif [[ -x "/usr/local/opt/mosquitto/sbin/mosquitto" ]]; then
-    exec /usr/local/opt/mosquitto/sbin/mosquitto -c mosquitto_local.conf -v
+    exec /usr/local/opt/mosquitto/sbin/mosquitto -v -p 1883
   else
     echo "Mosquitto no encontrado. Instálalo:"
     echo "  Linux: sudo apt-get install -y mosquitto mosquitto-clients"

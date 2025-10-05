@@ -110,3 +110,8 @@ class ArduinoData:
             } if self.seismic_event or self.has_earthquake else {}
         }
 
+
+
+
+
+

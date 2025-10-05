@@ -458,3 +458,146 @@ async def get_realtime_stream(
             detail=f"Error retrieving realtime stream: {str(e)}"
         )
 
+
+# ============================================================
+# NEW ENDPOINTS FOR SENSOR GROUPS AND BUS POSITIONS
+# ============================================================
+
+@router.get("/sensors/metro")
+async def get_active_sensor_group_metro(
+    hours: int = Query(24, ge=1, le=168, description="Hours to look back (1-168)"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records"),
+    dashboard_repo: DashboardRepository = Depends(get_dashboard_repository)
+) -> Dict[str, Any]:
+    """
+    Get active sensor group data for Metro
+    
+    Args:
+        hours: Number of hours to look back (default 24, max 168)
+        limit: Maximum number of records to return (default 100, max 1000)
+    
+    Returns:
+        List of active sensor group records for Metro
+    """
+    try:
+        data = dashboard_repo.get_active_sensor_group_metro(hours=hours, limit=limit)
+        return {
+            "hours": hours,
+            "limit": limit,
+            "count": len(data),
+            "data": data
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving active sensor group metro: {str(e)}"
+        )
+
+
+@router.get("/sensors/urban")
+async def get_active_sensor_group_urban(
+    hours: int = Query(24, ge=1, le=168, description="Hours to look back (1-168)"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records"),
+    dashboard_repo: DashboardRepository = Depends(get_dashboard_repository)
+) -> Dict[str, Any]:
+    """
+    Get active sensor group data for Urban
+    
+    Args:
+        hours: Number of hours to look back (default 24, max 168)
+        limit: Maximum number of records to return (default 100, max 1000)
+    
+    Returns:
+        List of active sensor group records for Urban
+    """
+    try:
+        data = dashboard_repo.get_active_sensor_group_urban(hours=hours, limit=limit)
+        return {
+            "hours": hours,
+            "limit": limit,
+            "count": len(data),
+            "data": data
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving active sensor group urban: {str(e)}"
+        )
+
+
+@router.get("/bus-position/metro")
+async def get_bus_position_metro(
+    hours: int = Query(24, ge=1, le=168, description="Hours to look back (1-168)"),
+    bus_id: Optional[int] = Query(None, description="Filter by specific bus ID"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records"),
+    dashboard_repo: DashboardRepository = Depends(get_dashboard_repository)
+) -> Dict[str, Any]:
+    """
+    Get bus position data for Metro
+    
+    Args:
+        hours: Number of hours to look back (default 24, max 168)
+        bus_id: Optional filter by specific bus ID
+        limit: Maximum number of records to return (default 100, max 1000)
+    
+    Returns:
+        List of bus position records for Metro with speed, position, and distance data
+    """
+    try:
+        data = dashboard_repo.get_bus_position_metro(
+            hours=hours, 
+            bus_id=bus_id, 
+            limit=limit
+        )
+        return {
+            "hours": hours,
+            "bus_id": bus_id,
+            "limit": limit,
+            "count": len(data),
+            "data": data
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving bus position metro: {str(e)}"
+        )
+
+
+@router.get("/bus-position/urban")
+async def get_bus_position_urban(
+    hours: int = Query(24, ge=1, le=168, description="Hours to look back (1-168)"),
+    bus_id: Optional[int] = Query(None, description="Filter by specific bus ID"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records"),
+    dashboard_repo: DashboardRepository = Depends(get_dashboard_repository)
+) -> Dict[str, Any]:
+    """
+    Get bus position data for Urban
+    
+    Args:
+        hours: Number of hours to look back (default 24, max 168)
+        bus_id: Optional filter by specific bus ID
+        limit: Maximum number of records to return (default 100, max 1000)
+    
+    Returns:
+        List of bus position records for Urban with speed, position, and distance data
+    """
+    try:
+        data = dashboard_repo.get_bus_position_urban(
+            hours=hours, 
+            bus_id=bus_id, 
+            limit=limit
+        )
+        return {
+            "hours": hours,
+            "bus_id": bus_id,
+            "limit": limit,
+            "count": len(data),
+            "data": data
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving bus position urban: {str(e)}"
+        )
+
+

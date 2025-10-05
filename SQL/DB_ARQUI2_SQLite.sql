@@ -111,6 +111,52 @@ CREATE INDEX IF NOT EXISTS IX_Gas_Time ON GasMeasurement(ts DESC);
 CREATE INDEX IF NOT EXISTS IX_Seis_Time ON SeismicMeasurement(ts DESC);
 
 -- ============================================================
+-- NUEVAS TABLAS PARA GRUPOS DE SENSORES Y POSICIONES DE BUSES
+-- ============================================================
+
+-- Tabla de grupo de sensores activos para Metro
+CREATE TABLE IF NOT EXISTS ActiveSensorGroupMetro (
+  sensor_group_metro_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts                    DATETIME NOT NULL DEFAULT (datetime('now')),
+  sensor_name           TEXT NOT NULL
+);
+
+-- Tabla de grupo de sensores activos para Urbano
+CREATE TABLE IF NOT EXISTS ActiveSensorGroupUrban (
+  sensor_group_urban_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts                    DATETIME NOT NULL DEFAULT (datetime('now')),
+  sensor_name           TEXT NOT NULL
+);
+
+-- Tabla de posición de buses para Metro
+CREATE TABLE IF NOT EXISTS BusPositionMetro (
+  position_metro_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts                    DATETIME NOT NULL DEFAULT (datetime('now')),
+  bus_id                INTEGER NOT NULL,
+  speed_kmh             REAL NULL,
+  position              TEXT NULL,
+  distance_to_next_stop REAL NULL,
+  FOREIGN KEY (bus_id) REFERENCES Bus(bus_id)
+);
+
+-- Tabla de posición de buses para Urbano
+CREATE TABLE IF NOT EXISTS BusPositionUrban (
+  position_urban_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts                    DATETIME NOT NULL DEFAULT (datetime('now')),
+  bus_id                INTEGER NOT NULL,
+  speed_kmh             REAL NULL,
+  position              TEXT NULL,
+  distance_to_next_stop REAL NULL,
+  FOREIGN KEY (bus_id) REFERENCES Bus(bus_id)
+);
+
+-- Índices para las nuevas tablas
+CREATE INDEX IF NOT EXISTS IX_ActiveSensorGroupMetro_Time ON ActiveSensorGroupMetro(ts DESC);
+CREATE INDEX IF NOT EXISTS IX_ActiveSensorGroupUrban_Time ON ActiveSensorGroupUrban(ts DESC);
+CREATE INDEX IF NOT EXISTS IX_BusPositionMetro_BusTime ON BusPositionMetro(bus_id, ts DESC);
+CREATE INDEX IF NOT EXISTS IX_BusPositionUrban_BusTime ON BusPositionUrban(bus_id, ts DESC);
+
+-- ============================================================
 -- VISTAS O CONSULTAS PARA EL FRONT
 -- ============================================================
 

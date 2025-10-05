@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Bus urbano morado sin padding: 45x22 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="45" height="22" viewBox="0 0 45 22">
+  <rect x="0" y="0" width="45" height="22" fill="#7E3FF2" stroke="#FFFFFF" stroke-width="2" rx="3" ry="3" />
+  <circle cx="10" cy="11" r="3" fill="#FFFFFF" opacity="0.75" />
+  <circle cx="35" cy="11" r="3" fill="#FFFFFF" opacity="0.75" />
+</svg>

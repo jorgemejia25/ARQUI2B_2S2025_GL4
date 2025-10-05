@@ -717,3 +717,111 @@ class DashboardRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Error getting realtime stream: {e}")
             raise
+    
+    # ============================================================
+    # NEW METHODS FOR SENSOR GROUPS AND BUS POSITIONS
+    # ============================================================
+    
+    def get_active_sensor_group_metro(
+        self, 
+        hours: int = 24,
+        limit: Optional[int] = 100
+    ) -> List[Dict[str, Any]]:
+        """Get active sensor group data for Metro"""
+        try:
+            query = """
+            SELECT sensor_group_metro_id, ts, sensor_name
+            FROM ActiveSensorGroupMetro
+            WHERE ts >= datetime('now', '-{} hours')
+            ORDER BY ts DESC
+            LIMIT {}
+            """.format(hours, limit)
+            
+            return self.execute_query(query) or []
+        except Exception as e:
+            logger.error(f"Error getting active sensor group metro: {e}")
+            raise
+    
+    def get_active_sensor_group_urban(
+        self, 
+        hours: int = 24,
+        limit: Optional[int] = 100
+    ) -> List[Dict[str, Any]]:
+        """Get active sensor group data for Urban"""
+        try:
+            query = """
+            SELECT sensor_group_urban_id, ts, sensor_name
+            FROM ActiveSensorGroupUrban
+            WHERE ts >= datetime('now', '-{} hours')
+            ORDER BY ts DESC
+            LIMIT {}
+            """.format(hours, limit)
+            
+            return self.execute_query(query) or []
+        except Exception as e:
+            logger.error(f"Error getting active sensor group urban: {e}")
+            raise
+    
+    def get_bus_position_metro(
+        self, 
+        hours: int = 24,
+        bus_id: Optional[int] = None,
+        limit: Optional[int] = 100
+    ) -> List[Dict[str, Any]]:
+        """Get bus position data for Metro"""
+        try:
+            base_query = """
+            SELECT 
+                bpm.position_metro_id, 
+                bpm.ts, 
+                bpm.bus_id,
+                b.code as bus_code,
+                bpm.speed_kmh,
+                bpm.position,
+                bpm.distance_to_next_stop
+            FROM BusPositionMetro bpm
+            JOIN Bus b ON bpm.bus_id = b.bus_id
+            WHERE bpm.ts >= datetime('now', '-{} hours')
+            """.format(hours)
+            
+            if bus_id:
+                base_query += f" AND bpm.bus_id = {bus_id}"
+            
+            base_query += " ORDER BY bpm.ts DESC LIMIT {}".format(limit)
+            
+            return self.execute_query(base_query) or []
+        except Exception as e:
+            logger.error(f"Error getting bus position metro: {e}")
+            raise
+    
+    def get_bus_position_urban(
+        self, 
+        hours: int = 24,
+        bus_id: Optional[int] = None,
+        limit: Optional[int] = 100
+    ) -> List[Dict[str, Any]]:
+        """Get bus position data for Urban"""
+        try:
+            base_query = """
+            SELECT 
+                bpu.position_urban_id, 
+                bpu.ts, 
+                bpu.bus_id,
+                b.code as bus_code,
+                bpu.speed_kmh,
+                bpu.position,
+                bpu.distance_to_next_stop
+            FROM BusPositionUrban bpu
+            JOIN Bus b ON bpu.bus_id = b.bus_id
+            WHERE bpu.ts >= datetime('now', '-{} hours')
+            """.format(hours)
+            
+            if bus_id:
+                base_query += f" AND bpu.bus_id = {bus_id}"
+            
+            base_query += " ORDER BY bpu.ts DESC LIMIT {}".format(limit)
+            
+            return self.execute_query(base_query) or []
+        except Exception as e:
+            logger.error(f"Error getting bus position urban: {e}")
+            raise

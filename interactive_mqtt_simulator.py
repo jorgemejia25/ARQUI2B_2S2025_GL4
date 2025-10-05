@@ -254,6 +254,79 @@ class InteractiveMQTTSimulator:
         print(f"Enviando actualización de ETA - {parada}: {tipo} en {tiempo}s desde {origen}")
         return self.send_mqtt_message("arduino/data", payload)
     
+    def simulate_active_sensors(self, duration_seconds: int = 30, interval_seconds: int = 5):
+        """
+        Simula datos de sensores activos insertando en ciclos
+        
+        Args:
+            duration_seconds: Duración total de la simulación
+            interval_seconds: Intervalo entre cada inserción
+        """
+        # Listas de sensores en ciclo
+        metro_sensors = ['PM1','S2', 'S1', 'PM2', 'S5']
+        urban_sensors = ['PU1', 'S4', 'S3', 'PU2', 'S3', 'S4']
+        
+        metro_index = 0
+        urban_index = 0
+        
+        start_time = time.time()
+        elapsed = 0
+        
+        print(f"\n{'='*60}")
+        print(f"INICIANDO SIMULACIÓN DE SENSORES ACTIVOS")
+        print(f"Duración: {duration_seconds} segundos")
+        print(f"Intervalo: {interval_seconds} segundos")
+        print(f"{'='*60}\n")
+        
+        iteration = 1
+        
+        while elapsed < duration_seconds:
+            # Sensor Metro actual
+            current_metro = metro_sensors[metro_index]
+            
+            # Sensor Urbano actual
+            current_urban = urban_sensors[urban_index]
+            
+            # Crear payloads
+            metro_payload = {
+                "timestamp": time.time(),
+                "sensor_type": "ACTIVE_SENSOR_METRO",
+                "sensor_name": current_metro,
+                "route_type": "metro"
+            }
+            
+            urban_payload = {
+                "timestamp": time.time(),
+                "sensor_type": "ACTIVE_SENSOR_URBAN",
+                "sensor_name": current_urban,
+                "route_type": "urban"
+            }
+            
+            # Enviar ambos mensajes
+            print(f"[{iteration}] Enviando sensores activos:")
+            print(f"  ├─ Metro:  {current_metro}")
+            print(f"  └─ Urbano: {current_urban}")
+            
+            self.send_mqtt_message("arduino/data/sensors", metro_payload)
+            self.send_mqtt_message("arduino/data/sensors", urban_payload)
+            
+            # Avanzar índices (ciclo circular)
+            metro_index = (metro_index + 1) % len(metro_sensors)
+            urban_index = (urban_index + 1) % len(urban_sensors)
+            
+            # Esperar intervalo
+            time.sleep(interval_seconds)
+            
+            # Actualizar tiempo transcurrido
+            elapsed = time.time() - start_time
+            iteration += 1
+        
+        print(f"\n{'='*60}")
+        print(f"SIMULACIÓN FINALIZADA")
+        print(f"Total de ciclos: {iteration - 1}")
+        print(f"Tiempo total: {elapsed:.1f} segundos")
+        print(f"{'='*60}\n")
+    
     def show_menu(self):
         """Muestra el menú interactivo"""
         print("\n" + "="*60)
@@ -267,8 +340,9 @@ class InteractiveMQTTSimulator:
         print("4.  Enviar infracción de tráfico")
         print("5.  Enviar alerta de gas alto")
         print("6.  Enviar actualización de ETA")
-        print("7.  Limpiar todas las alertas")
-        print("8.  Enviar datos continuos (5 segundos)")
+        print("7.  Simular datos de Sensores Activos (Metro y Urbano)")
+        print("8.  Limpiar todas las alertas")
+        print("9.  Enviar datos continuos (5 segundos)")
         print("0.  Salir")
         print("="*60)
     
@@ -279,7 +353,7 @@ class InteractiveMQTTSimulator:
         while True:
             try:
                 self.show_menu()
-                choice = input("\nSelecciona una opción (0-8): ").strip()
+                choice = input("\nSelecciona una opción (0-9): ").strip()
                 
                 if choice == "0":
                     print("Hasta luego!")
@@ -327,8 +401,33 @@ class InteractiveMQTTSimulator:
                         tiempo = 120
                     self.send_eta_update(parada, tipo, tiempo)
                 elif choice == "7":
-                    print("Todas las alertas limpiadas")
+                    # Nueva opción: Simular sensores activos
+                    print("\n--- SIMULACIÓN DE SENSORES ACTIVOS ---")
+                    print("Metro:  PM1 → S2 → S1 → PM2 → S5 → PM1 (ciclo)")
+                    print("Urbano: PU1 → S4 → S3 → PU2 → S3 → S4 → PU1 (ciclo)\n")
+                    
+                    duration = input("Ingresa la duración total en segundos (por defecto 30): ").strip()
+                    try:
+                        duration = int(duration) if duration else 30
+                    except ValueError:
+                        duration = 30
+                    
+                    interval = input("Ingresa el intervalo entre inserciones en segundos (por defecto 5): ").strip()
+                    try:
+                        interval = int(interval) if interval else 5
+                    except ValueError:
+                        interval = 5
+                    
+                    if duration < interval:
+                        print(f"⚠️  Advertencia: La duración ({duration}s) es menor que el intervalo ({interval}s)")
+                        print("   Solo se ejecutará 1 ciclo.\n")
+                    
+                    print(f"\nIniciando simulación...")
+                    self.simulate_active_sensors(duration, interval)
+                    
                 elif choice == "8":
+                    print("Todas las alertas limpiadas")
+                elif choice == "9":
                     duration = input("Ingresa la duración en segundos (por defecto 5): ").strip()
                     try:
                         duration = int(duration) if duration else 5

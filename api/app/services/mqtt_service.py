@@ -44,6 +44,10 @@ class MQTTService:
         for topic in self.topics:
             client.subscribe(topic)
             logger.info(f"Subscribed to topic: {topic}")
+        
+        # Subscribe to new sensor topic
+        client.subscribe("arduino/data/sensors")
+        logger.info(f"Subscribed to topic: arduino/data/sensors")
     
     def on_message(self, client, userdata, msg):
         """Callback when message is received"""

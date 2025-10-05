@@ -26,6 +26,9 @@ class ApiConfig {
   static String get dashboardSeismicChartUrl =>
       '$dashboardBaseUrl/charts/seismic';
   static String get dashboardHourlyStatsUrl => '$dashboardBaseUrl/stats/hourly';
+  // NUEVOS: Endpoints posiciones de buses
+  static String get busPositionMetroUrl => '$dashboardBaseUrl/bus-position/metro';
+  static String get busPositionUrbanUrl => '$dashboardBaseUrl/bus-position/urban';
 
   // Endpoints de alertas
   static String get alertsBaseUrl => '$baseUrl$apiV1Prefix/alerts';

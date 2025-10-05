@@ -10,8 +10,29 @@ import '../models/traffic_light.dart';
 import '../models/bus_stop.dart';
 import 'bus_stop_eta_widget.dart';
 import 'eta_info_modal.dart';
-import 'moving_bus_widget.dart';
 import 'moving_urban_bus_widget.dart';
+import 'moving_bus_widget.dart'; // re-import after enabling sensorControlled
+import '../services/bus_position_service.dart'; // NUEVO
+import '../services/bus_progress_service.dart'; // NUEVO progreso entre paradas
+// import 'simple_sensor_controlled_metro_bus.dart'; // Reemplazado por MovingBusWidget sensorControlled
+
+// ---------------------------------------------------------------------------
+// CONFIGURACIÓN: DURACIÓN DE ANIMACIÓN ENTRE PARADAS (BUS METRO)
+// ---------------------------------------------------------------------------
+// Esta constante define el TIEMPO de animación (salto) de una parada a la
+// siguiente cuando el bus rojo (metro) está en modo `sensorDiscreteStops`.
+// Cambia este valor para acelerar o ralentizar el movimiento entre paradas.
+// Ejemplos de edición rápida:
+//   const Duration(milliseconds: 400)  // 0.4s más rápido
+//   const Duration(milliseconds: 750)  // 0.75s más lento
+//   const Duration(seconds: 1)         // 1.0s por parada
+// NOTA: No necesitas modificar el widget; basta con cambiar aquí.
+const Duration kMetroPerStopAnimationDuration = Duration(milliseconds: 2000); // Duración entre paradas (metro)
+
+// Configuración similar para el BUS URBANO (morado) cuando adopte modo discreto.
+// Edita este valor para cambiar cuánto dura cada salto entre paradas urbanas.
+// Mantener separado permite ajustar independientemente ambas rutas.
+const Duration kUrbanPerStopAnimationDuration = Duration(milliseconds: 2000); // Duración entre paradas (urbano)
 
 class MapContainer extends StatefulWidget {
   const MapContainer({super.key});
@@ -31,6 +52,13 @@ class _MapContainerState extends State<MapContainer> {
   final BusStopService _busStopService = BusStopService.instance;
   StreamSubscription<Map<String, BusStopEtaInfo>>? _busStopsSubscription;
 
+  // NUEVO: servicio de posiciones
+  final BusPositionService _busPositionService = BusPositionService();
+  StreamSubscription<BusPositionInfo>? _metroPosSub;
+  StreamSubscription<BusPositionInfo>? _urbanPosSub;
+  String? _metroPosText; // texto crudo de posición
+  String? _urbanPosText; // texto crudo de posición
+
   // Controlador para el zoom del mapa
   final TransformationController _transformationController =
       TransformationController();
@@ -39,13 +67,23 @@ class _MapContainerState extends State<MapContainer> {
   static const double _svgWidth = 628;
   // _svgHeight eliminado (no se usa tras cambio de layout)
 
-  // (Estilo dinámico removido, usamos el SVG tal cual)
-
   @override
   void initState() {
     super.initState();
     _initializeMap();
     _setupWebSocket();
+    _setupBusPositionPolling(); // NUEVO
+    // Inicializar barras de progreso (evitar 'Calculando...')
+    final progress = BusProgressService.instance;
+    for (final stop in ['PM1','PM2','PU1','PU2']) {
+      progress.updateStopProgress(
+        stopName: stop,
+        progress: 0.0,
+        remainingDistanceMeters: 1000.0, // distancia completa inicial (aprox)
+        etaSeconds: 0,
+        autoResetOnFull: false,
+      );
+    }
   }
 
   @override
@@ -56,7 +94,26 @@ class _MapContainerState extends State<MapContainer> {
     _transformationController.dispose();
     _webSocketService.disconnect();
     _busStopWebSocketService.disconnect();
+    // NUEVO: cancelar subs y detener servicio
+    _metroPosSub?.cancel();
+    _urbanPosSub?.cancel();
+    _busPositionService.stop();
     super.dispose();
+  }
+
+  void _setupBusPositionPolling() {
+    // Iniciar polling
+    _busPositionService.start();
+    _metroPosSub = _busPositionService.metroStream.listen((info) {
+      setState(() {
+        _metroPosText = info.positionRaw; // usar tal cual por ahora
+      });
+    });
+    _urbanPosSub = _busPositionService.urbanStream.listen((info) {
+      setState(() {
+        _urbanPosText = info.positionRaw; // usar tal cual por ahora
+      });
+    });
   }
 
   Future<void> _initializeMap() async {
@@ -328,6 +385,10 @@ class _MapContainerState extends State<MapContainer> {
       );
     }
 
+    // Texto para overlay de posiciones (placeholder '--' si null)
+    final metroText = _metroPosText ?? '--';
+    final urbanText = _urbanPosText ?? '--';
+
     return Container(
       color: Colors.grey[100],
       width: double.infinity,
@@ -360,10 +421,23 @@ class _MapContainerState extends State<MapContainer> {
                             fit: BoxFit.contain,
                             allowDrawingOutsideViewBox: true,
                           ),
-                          // Bus rojo animado recorriendo el circuito
-                          MovingBusWidget(stopSeconds: 3.0, maxSegmentSeconds: 0.9),
+                          // Bus rojo (metro) original ahora controlado por sensor stream (1s por segmento)
+                          MovingBusWidget(
+                            sensorControlled: true,
+                            sensorDiscreteStops: true, // modo saltos entre paradas
+                            segmentDuration: kMetroPerStopAnimationDuration, // TIEMPO POR PARADA (editar constante arriba)
+                            sensorStream: _busPositionService.metroStream,
+                          ),
                           // Bus urbano morado animado
-                          MovingUrbanBusWidget(stopSeconds: 3.0, maxSegmentSeconds: 0.9),
+                          MovingUrbanBusWidget(
+                            sensorControlled: true,
+                            sensorDiscreteStops: true,
+                            segmentDuration: kUrbanPerStopAnimationDuration, // duración entre paradas urbano
+                            sensorStream: _busPositionService.urbanStream,
+                            // Parámetros legacy ignorados en modo discreto pero mantenidos por compatibilidad
+                            stopSeconds: 0.0,
+                            maxSegmentSeconds: 0.9,
+                          ),
                           const BusStopsEtaOverlay(),
                         ],
                       ),
@@ -374,6 +448,68 @@ class _MapContainerState extends State<MapContainer> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Overlay NUEVO de posiciones
+                          Container(
+                            width: 220,
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                              border: Border.all(color: const Color(0xFFE0E0E0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Posiciones (1s)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(Icons.directions_bus, size: 16, color: Colors.redAccent),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Metro: $metroText',
+                                        style: const TextStyle(fontSize: 12),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(Icons.directions_bus_filled, size: 16, color: Colors.deepPurple),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Urbano: $urbanText',
+                                        style: const TextStyle(fontSize: 12),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                           Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: FloatingActionButton(
@@ -461,29 +597,166 @@ class _BottomEtaPanel extends StatelessWidget {
         ],
         border: const Border(top: BorderSide(color: Color(0xFFE0E0E0))),
       ),
-      child: StreamBuilder<Map<String, BusStopEtaInfo>>(
-        stream: busStopService.busStopsStream,
-        builder: (context, snapshot) {
-          final stopsMap = snapshot.data ?? {};
-          if (stopsMap.isEmpty) {
-            return const Center(
-              child: Text(
-                'Sin datos de paradas aún',
-                style: TextStyle(color: Colors.grey),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 110,
+            child: _ApproxProgressPanel(),
+          ),
+          SizedBox(
+            height: 30,
+            child: StreamBuilder<Map<String, BusStopEtaInfo>>(
+              stream: busStopService.busStopsStream,
+              builder: (context, snapshot) {
+                final stopsMap = snapshot.data ?? {};
+                if (stopsMap.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                final stops = stopsMap.values.toList()
+                  ..sort((a, b) => a.busStop.id.compareTo(b.busStop.id));
+                return ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  itemCount: stops.length,
+                  itemBuilder: (context, index) => _EtaChip(info: stops[index]),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ApproxProgressPanel extends StatelessWidget {
+  final List<String> _orderedStops = const ['PM1', 'PM2', 'PU1', 'PU2'];
+  const _ApproxProgressPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<StopApproachProgress>>(
+      stream: BusProgressService.instance.stream,
+      initialData: BusProgressService.instance.currentValues,
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? BusProgressService.instance.currentValues;
+        final map = {for (final p in data) p.stopName: p};
+        return ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          itemCount: _orderedStops.length,
+          itemBuilder: (context, index) {
+            final name = _orderedStops[index];
+            final prog = map[name];
+            final progress = (prog?.progress ?? 0).clamp(0.0, 1.0);
+            final dist = prog?.remainingDistanceMeters ?? 0;
+            final eta = prog?.etaSeconds ?? 0;
+            final etaStr = eta <= 0 ? '--' : _formatEta(eta);
+            return Container(
+              width: 150,
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFEEEEEE)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  )
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _ArrivalBadge(progress: progress),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      minHeight: 10,
+                      value: progress == 0 ? 0.02 : progress, // pequeño indicador inicial
+                      backgroundColor: const Color(0xFFF1F3F5),
+                      valueColor: AlwaysStoppedAnimation<Color>(_barColor(name)),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Dist: ${dist.toStringAsFixed(0)} m',
+                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                  ),
+                  Text(
+                    'ETA: $etaStr',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ],
               ),
             );
-          }
-          final stops = stopsMap.values.toList()
-            ..sort((a, b) => a.busStop.id.compareTo(b.busStop.id));
-          return ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: stops.length,
-            itemBuilder: (context, index) {
-              return _EtaChip(info: stops[index]);
-            },
-          );
-        },
+          },
+        );
+      },
+    );
+  }
+
+  String _formatEta(double s) {
+    if (s < 60) {
+      return '${s.toStringAsFixed(1)}s';
+    }
+    final m = (s / 60).floor();
+    final rem = (s % 60).round();
+    return '${m}m ${rem}s';
+  }
+
+  Color _barColor(String stop) {
+    switch (stop) {
+      case 'PM1':
+        return Colors.redAccent;
+      case 'PM2':
+        return Colors.red;
+      case 'PU1':
+        return Colors.deepPurple;
+      case 'PU2':
+        return Colors.purple;
+      default:
+        return Colors.blueGrey;
+    }
+  }
+}
+
+class _ArrivalBadge extends StatelessWidget {
+  final double progress;
+  const _ArrivalBadge({required this.progress});
+  @override
+  Widget build(BuildContext context) {
+    final arrived = progress >= 0.999;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: arrived ? Colors.green[600] : Colors.grey[300],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        arrived ? 'Llegó' : '${(progress * 100).floor()}%',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: arrived ? Colors.white : Colors.black87,
+        ),
       ),
     );
   }
@@ -504,7 +777,6 @@ class _EtaChip extends StatelessWidget {
       case BusStopState.inactive:
         return Colors.grey;
     }
-    return Colors.grey; // fallback
   }
 
   @override

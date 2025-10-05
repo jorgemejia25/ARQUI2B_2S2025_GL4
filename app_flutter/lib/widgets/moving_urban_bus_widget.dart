@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../services/bus_position_service.dart'; // NUEVO para sensor stream
+import 'dart:async';
+import '../services/bus_progress_service.dart'; // progreso compartido
 
 /// Bus urbano morado que recorre las paradas azules (PU1, S4, S3, PU2, S3, S4) en bucle.
 /// Dirección:
@@ -10,14 +13,22 @@ import 'package:flutter_svg/flutter_svg.dart';
 ///  - Giro en U después de sobrepasar S4 sube al carril superior
 /// Paradas (2s): PU1, S4 (arriba), S3 (arriba), PU2, S3 (abajo), S4 (abajo)
 class MovingUrbanBusWidget extends StatefulWidget {
-  final double maxSegmentSeconds;
-  final double stopSeconds;
-  final double? totalCycleSeconds; // opcional, si no se da se calcula
+  final double maxSegmentSeconds; // modo automático
+  final double stopSeconds; // modo automático
+  final double? totalCycleSeconds; // modo automático
+  final Stream<BusPositionInfo>? sensorStream; // NUEVO
+  final bool sensorControlled; // NUEVO: pausar en parada según sensor
+  final bool sensorDiscreteStops; // NUEVO: saltos discretos entre paradas
+  final Duration segmentDuration; // duración del salto discreto
   const MovingUrbanBusWidget({
     super.key,
     this.maxSegmentSeconds = 0.9,
     this.stopSeconds = 3.0,
     this.totalCycleSeconds,
+    this.sensorStream,
+    this.sensorControlled = false,
+    this.sensorDiscreteStops = false,
+    this.segmentDuration = const Duration(milliseconds: 500),
   });
 
   @override
@@ -27,6 +38,81 @@ class MovingUrbanBusWidget extends StatefulWidget {
 class _MovingUrbanBusWidgetState extends State<MovingUrbanBusWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  StreamSubscription<BusPositionInfo>? _sensorSub;
+  bool get _isDiscrete => widget.sensorControlled && widget.sensorDiscreteStops;
+  bool _paused = false; // cuando llega a parada objetivo
+  int? _currentStopIndex; // índice de la parada actual (en stops oficiales)
+  int? _desiredStopIndex; // próxima parada objetivo
+  Offset? _overridePos; // posición override en modo discreto
+  double? _overrideRot; // rotación override en modo discreto
+  List<Offset> _activePath = [];
+  List<double> _activeSegLens = [];
+  double _activeTotalLen = 0.0;
+
+  // ---------------------------
+  // MAPEO DE PORCENTAJES (Urbano)
+  // Loop conceptual para barra PU1: PU1(100) -> S4↑(15) -> S3↑(30) -> PU2(50) -> S3↓(65) -> S4↓(80) -> PU1(100)
+  final List<int> _loopPU1 = [0, 2, 4, 12, 13, 15, 0];
+  final List<double> _pctPU1 = [100, 15, 30, 50, 65, 80, 100];
+  // Loop conceptual para barra PU2: PU2(100) -> S3↓(15) -> S4↓(30) -> PU1(50) -> S4↑(65) -> S3↑(80) -> PU2(100)
+  final List<int> _loopPU2 = [12, 13, 15, 0, 2, 4, 12];
+  final List<double> _pctPU2 = [100, 15, 30, 50, 65, 80, 100];
+
+  (double? from, double? to, bool reset) _segmentPct(
+    int fromIdx,
+    int toIdx,
+    List<int> loopIdx,
+    List<double> loopPct,
+  ) {
+    for (int i = 0; i < loopIdx.length - 1; i++) {
+      if (loopIdx[i] == fromIdx && loopIdx[i + 1] == toIdx) {
+        final bool r = i == 0; // primer tramo: reinicia a 0 durante movimiento
+        final startVal = r ? 0.0 : loopPct[i];
+        return (startVal, loopPct[i + 1], r);
+      }
+    }
+    return (null, null, false);
+  }
+
+  void _emitStaticCheckpoint(int stopIdx) {
+    final pos1 = _loopPU1.indexOf(stopIdx);
+    if (pos1 != -1) {
+      BusProgressService.instance.updateStopProgress(
+        stopName: 'PU1',
+        progress: (_pctPU1[pos1] / 100.0).clamp(0.0, 1.0),
+        remainingDistanceMeters: _remainingFromPercent(_pctPU1[pos1]),
+        etaSeconds: 0,
+        autoResetOnFull: false,
+      );
+    }
+    final pos2 = _loopPU2.indexOf(stopIdx);
+    if (pos2 != -1) {
+      BusProgressService.instance.updateStopProgress(
+        stopName: 'PU2',
+        progress: (_pctPU2[pos2] / 100.0).clamp(0.0, 1.0),
+        remainingDistanceMeters: _remainingFromPercent(_pctPU2[pos2]),
+        etaSeconds: 0,
+        autoResetOnFull: false,
+      );
+    }
+  }
+
+  double _remainingFromPercent(double pct) {
+    // Cada 100% = destino alcanzado => 0m restantes
+    // Por enunciado: 1000m entre paradas principales, 1% = 10m avanzados, remaining = (100 - pct)*10
+    return (100.0 - pct) * 10.0;
+  }
+
+  // Mapear nombres de sensores urbanos al índice de parada en _path
+  // Secuencia urbana: PU1, S4, S3, PU2, S3, S4 (loop)
+  final Map<String, int> _urbanSensorIndex = {
+    'PU1': 0, // arriba izquierda
+    'S4': 2,  // S4 arriba
+    'S3': 4,  // S3 arriba (primera aparición)
+    'PU2': 12,
+    // Segunda S3 (abajo) -> índice 13
+    // Segunda S4 (abajo) -> índice 15
+  };
 
   // Dimensiones del bus compacto
   static const double busW = 45;
@@ -119,10 +205,26 @@ class _MovingUrbanBusWidgetState extends State<MovingUrbanBusWidget>
   void initState() {
     super.initState();
     _precompute();
-    _controller = AnimationController(
-      duration: Duration(milliseconds: (totalCycleSeconds * 1000).round()),
-      vsync: this,
-    )..repeat();
+    if (_isDiscrete) {
+      _controller = AnimationController(
+        duration: widget.segmentDuration,
+        vsync: this,
+      );
+      _controller.addListener(_discreteTick);
+    } else {
+      _controller = AnimationController(
+        duration: Duration(milliseconds: (totalCycleSeconds * 1000).round()),
+        vsync: this,
+      )..repeat();
+    }
+    if (widget.sensorControlled && widget.sensorStream != null) {
+      _sensorSub = widget.sensorStream!.listen((info) {
+        final raw = info.positionRaw?.trim();
+        if (raw != null) {
+          _handleSensor(raw);
+        }
+      });
+    }
   }
 
   void _precompute() {
@@ -222,16 +324,160 @@ class _MovingUrbanBusWidgetState extends State<MovingUrbanBusWidget>
 
   @override
   void dispose() {
+    _sensorSub?.cancel();
+    if (_isDiscrete) {
+      _controller.removeListener(_discreteTick);
+    }
     _controller.dispose();
     super.dispose();
   }
 
+  void _handleSensor(String sensor) {
+    if (!_isDiscrete) return; // Por ahora sólo implementamos modo discreto
+    // Resolver duplicados: segunda aparición de S3 y S4 cuando ya pasamos por PU2
+    int? baseIndex = _urbanSensorIndex[sensor];
+    if (sensor == 'S3') {
+      // Si ya estuvimos en PU2 (12) y en S3 inferior (13) permitir saltar a 13
+      if (_currentStopIndex != null && _currentStopIndex! >= 12) {
+        baseIndex = 13; // S3 inferior
+      }
+    } else if (sensor == 'S4') {
+      if (_currentStopIndex != null && _currentStopIndex! >= 13) {
+        baseIndex = 15; // S4 inferior
+      }
+    }
+    final idx = baseIndex;
+    if (idx == null) return;
+    if (_currentStopIndex == null) {
+      _currentStopIndex = idx;
+      _overridePos = _path[idx];
+      _overrideRot = _orientations[idx];
+      _paused = true;
+      _emitStaticCheckpoint(idx);
+      setState(() {});
+      return;
+    }
+    if (_currentStopIndex == idx) return; // sin cambio
+    _desiredStopIndex = idx;
+    _buildActivePath(_currentStopIndex!, idx);
+    _paused = false;
+    _controller.duration = widget.segmentDuration;
+    _controller.reset();
+    _controller.forward();
+  }
+
+  void _buildActivePath(int fromIdx, int toIdx) {
+    _activePath = [];
+    int i = fromIdx;
+    _activePath.add(_path[i]);
+    while (i != toIdx) {
+      i = (i + 1) % _path.length;
+      _activePath.add(_path[i]);
+    }
+    _activeSegLens = [];
+    _activeTotalLen = 0.0;
+    for (int j = 0; j < _activePath.length - 1; j++) {
+      final d = (_activePath[j + 1] - _activePath[j]).distance;
+      _activeSegLens.add(d);
+      _activeTotalLen += d;
+    }
+  }
+
+  void _discreteTick() {
+    if (_paused || _activePath.length < 2) return;
+    final t = _controller.value; // 0..1
+    final targetDist = t * _activeTotalLen;
+    double acc = 0.0;
+    Offset pos = _activePath.first;
+    double rot = _overrideRot ?? 0;
+    for (int j = 0; j < _activeSegLens.length; j++) {
+      final segLen = _activeSegLens[j];
+      if (targetDist <= acc + segLen || j == _activeSegLens.length - 1) {
+        final local = segLen == 0 ? 0 : (targetDist - acc) / segLen;
+        final p0 = _activePath[j];
+        final p1 = _activePath[j + 1];
+        pos = Offset(
+          p0.dx + (p1.dx - p0.dx) * local,
+          p0.dy + (p1.dy - p0.dy) * local,
+        );
+        rot = math.atan2(p1.dy - p0.dy, p1.dx - p0.dx);
+        break;
+      }
+      acc += segLen;
+    }
+    _overridePos = pos;
+    _overrideRot = rot;
+    _emitInterpolated(pos);
+    if (_controller.status == AnimationStatus.completed) {
+      _paused = true;
+      _currentStopIndex = _desiredStopIndex;
+      _activePath.clear();
+      _activeSegLens.clear();
+      if (_currentStopIndex != null) _emitStaticCheckpoint(_currentStopIndex!);
+      setState(() {});
+    } else {
+      setState(() {});
+    }
+  }
+  void _emitInterpolated(Offset pos) {
+    if (_currentStopIndex == null || _desiredStopIndex == null) return;
+    final fromIdx = _currentStopIndex!;
+    final toIdx = _desiredStopIndex!;
+    // Distancia local para interpolación lineal simple
+    // (distancia total ya implícita en _controller.value; no necesitamos distAlong)
+    // Ya calculamos pos real; usamos _controller.value para factor directo
+    final local = _controller.value; // 0..1 del salto total
+    final (pFrom1, pTo1, _) = _segmentPct(fromIdx, toIdx, _loopPU1, _pctPU1);
+    final (pFrom2, pTo2, _) = _segmentPct(fromIdx, toIdx, _loopPU2, _pctPU2);
+    if (pFrom1 != null && pTo1 != null) {
+      final pct = (pFrom1 + (pTo1 - pFrom1) * local).clamp(0.0, 100.0);
+      BusProgressService.instance.updateStopProgress(
+        stopName: 'PU1',
+        progress: pct / 100.0,
+        remainingDistanceMeters: _remainingFromPercent(pct),
+        etaSeconds: (widget.segmentDuration.inMilliseconds / 1000.0) * (1 - local),
+        autoResetOnFull: false,
+      );
+    }
+    if (pFrom2 != null && pTo2 != null) {
+      final pct2 = (pFrom2 + (pTo2 - pFrom2) * local).clamp(0.0, 100.0);
+      BusProgressService.instance.updateStopProgress(
+        stopName: 'PU2',
+        progress: pct2 / 100.0,
+        remainingDistanceMeters: _remainingFromPercent(pct2),
+        etaSeconds: (widget.segmentDuration.inMilliseconds / 1000.0) * (1 - local),
+        autoResetOnFull: false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isDiscrete) {
+      final pos = _overridePos ?? _path.first;
+      final rot = _overrideRot ?? 0.0;
+      return Positioned(
+        left: pos.dx - busW / 2,
+        top: pos.dy - busH / 2,
+        child: Transform.rotate(
+          angle: rot,
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: busW,
+            height: busH,
+            child: SvgPicture.asset(
+              'assets/Single_bus_purple_compact.svg',
+              width: busW,
+              height: busH,
+            ),
+          ),
+        ),
+      );
+    }
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-  final t = _controller.value * totalCycleSeconds;
+        final t = _controller.value * totalCycleSeconds;
         final sample = _sample(t);
         return Positioned(
           left: sample.pos.dx - busW / 2,

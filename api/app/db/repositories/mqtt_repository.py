@@ -261,6 +261,21 @@ class MQTTRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Error getting last bus position sensor: {e}")
             return None
+
+    def _get_last_bus_position_sensors(self, route_type: str, limit: int = 2) -> list[str]:
+        """Return a list with the last <limit> sensor names (newest first)."""
+        try:
+            if route_type == "metro":
+                query = "SELECT position FROM BusPositionMetro ORDER BY ts DESC LIMIT ?"
+            else:
+                query = "SELECT position FROM BusPositionUrban ORDER BY ts DESC LIMIT ?"
+            result = self.execute_query(query, (limit,))
+            if not result:
+                return []
+            return [row["position"] for row in result]
+        except Exception as e:
+            logger.error(f"Error getting last bus position sensors: {e}")
+            return []
     
     def _get_next_expected_sensor(self, current_sensor: str, route_type: str) -> str:
         """
@@ -339,20 +354,80 @@ class MQTTRepository(BaseRepository):
             # STEP 3: Validate sequence
             should_save_to_bus_position = False
             
-            if last_sensor is None:
-                # Empty table: accept any sensor as starting point
-                should_save_to_bus_position = True
-                logger.info(f"🚀 First sensor in BusPosition{route_type.capitalize()}: {sensor_name}")
-            else:
-                # Calculate expected next sensor
-                expected_sensor = self._get_next_expected_sensor(last_sensor, route_type)
-                
-                if sensor_name == expected_sensor:
+            if route_type == "urban":
+                # Lógica especial con ambigüedad inicial por duplicados (S3, S4)
+                sequence = URBAN_SEQUENCE
+                if last_sensor is None:
+                    # Primer sensor: aceptar siempre y no forzamos índice todavía
                     should_save_to_bus_position = True
-                    logger.info(f"✅ Valid sensor ({route_type}): {sensor_name} (expected: {expected_sensor})")
+                    logger.info(f"🚀 (urban) primer sensor aceptado: {sensor_name}")
                 else:
-                    should_save_to_bus_position = False
-                    logger.warning(f"❌ Invalid sensor ({route_type}): {sensor_name} (expected: {expected_sensor}, skipped for BusPosition)")
+                    last_two = self._get_last_bus_position_sensors("urban", 2)
+                    if len(last_two) < 2:
+                        # Solo un sensor previo: permitir cualquiera de los siguientes posibles
+                        # para todas las ocurrencias del last_sensor en la secuencia
+                        candidate_next = set()
+                        for i, val in enumerate(sequence):
+                            if val == last_sensor:
+                                candidate_next.add(sequence[(i + 1) % len(sequence)])
+                        if sensor_name in candidate_next:
+                            should_save_to_bus_position = True
+                            logger.info(
+                                f"✅ (urban) sensor válido en fase ambigua: {sensor_name} (posibles={sorted(candidate_next)})"
+                            )
+                        else:
+                            logger.warning(
+                                f"❌ (urban) sensor descartado en fase ambigua: {sensor_name} (esperados uno de {sorted(candidate_next)})"
+                            )
+                    else:
+                        # Tenemos al menos dos previos: prev2 -> prev1 ya desambigua
+                        prev1 = last_two[0]  # más reciente
+                        prev2 = last_two[1]
+                        # Encontrar índices donde prev2 -> prev1 es válido
+                        matching_indices = []
+                        for i, val in enumerate(sequence):
+                            if val == prev2 and sequence[(i + 1) % len(sequence)] == prev1:
+                                matching_indices.append((i + 1) % len(sequence))
+                        if len(matching_indices) == 1:
+                            idx_prev1 = matching_indices[0]
+                            expected = sequence[(idx_prev1 + 1) % len(sequence)]
+                            if sensor_name == expected:
+                                should_save_to_bus_position = True
+                                logger.info(
+                                    f"✅ (urban) sensor válido tras desambiguar: {sensor_name} (expected: {expected})"
+                                )
+                            else:
+                                logger.warning(
+                                    f"❌ (urban) sensor inválido: {sensor_name} (expected: {expected})"
+                                )
+                        else:
+                            # Si por algún motivo no se pudo desambiguar (no debería pasar con secuencia actual), 
+                            # volvemos a lógica de conjunto de posibles
+                            candidate_next = set()
+                            for i, val in enumerate(sequence):
+                                if val == last_sensor:
+                                    candidate_next.add(sequence[(i + 1) % len(sequence)])
+                            if sensor_name in candidate_next:
+                                should_save_to_bus_position = True
+                                logger.info(
+                                    f"✅ (urban) sensor válido fallback: {sensor_name} (posibles={sorted(candidate_next)})"
+                                )
+                            else:
+                                logger.warning(
+                                    f"❌ (urban) sensor inválido fallback: {sensor_name} (esperados uno de {sorted(candidate_next)})"
+                                )
+            else:
+                # Comportamiento original para metro
+                if last_sensor is None:
+                    should_save_to_bus_position = True
+                    logger.info(f"🚀 First sensor in BusPosition{route_type.capitalize()}: {sensor_name}")
+                else:
+                    expected_sensor = self._get_next_expected_sensor(last_sensor, route_type)
+                    if sensor_name == expected_sensor:
+                        should_save_to_bus_position = True
+                        logger.info(f"✅ Valid sensor ({route_type}): {sensor_name} (expected: {expected_sensor})")
+                    else:
+                        logger.warning(f"❌ Invalid sensor ({route_type}): {sensor_name} (expected: {expected_sensor}, skipped for BusPosition)")
             
             # STEP 4: Save to BusPosition only if valid
             # Using default values for simulation: bus_id=1, speed_kmh=50, distance_to_next_stop=100

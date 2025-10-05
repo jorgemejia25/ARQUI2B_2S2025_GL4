@@ -263,8 +263,8 @@ class InteractiveMQTTSimulator:
             interval_seconds: Intervalo entre cada inserción
         """
         # Listas de sensores en ciclo
-        metro_sensors = ['PM1','S1','S1','S2', 'S1', 'PM2', 'S5', 'PM1']
-        urban_sensors = ['PU1', 'S4', 'S3', 'PU2', 'S3', 'S4', 'PU1']
+        metro_sensors = ['PM1','S2', 'S1', 'PM2', 'S5']
+        urban_sensors = ['PU1', 'S4', 'S3', 'PU2', 'S3', 'S4']
         
         metro_index = 0
         urban_index = 0

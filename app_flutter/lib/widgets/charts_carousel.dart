@@ -199,7 +199,7 @@ class _ChartsCarouselState extends State<ChartsCarousel> {
       final gasTimeline = widget.gasData!['timeline'] as List;
       if (gasTimeline.isNotEmpty) {
         final thresholdPpm =
-            widget.gasData!['threshold_ppm'] as double? ?? 300.0;
+            (widget.gasData!['threshold_ppm'] as num?)?.toDouble() ?? 300.0;
         charts.add(
           GasAnalyticsChart(
             data: List<Map<String, dynamic>>.from(gasTimeline),
@@ -216,7 +216,7 @@ class _ChartsCarouselState extends State<ChartsCarousel> {
       final seismicMeasurements = widget.seismicData!['measurements'] as List;
       if (seismicMeasurements.isNotEmpty) {
         final thresholdIntensity =
-            widget.seismicData!['threshold_intensity'] as double? ?? 2.0;
+            (widget.seismicData!['threshold_intensity'] as num?)?.toDouble() ?? 2.0;
         charts.add(
           SeismicAnalyticsChart(
             data: List<Map<String, dynamic>>.from(seismicMeasurements),

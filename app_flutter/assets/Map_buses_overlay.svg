@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Overlay transparente de buses para superponer sobre Map.svg
+     Dimensiones idénticas: 909x1123
+     Uso en Flutter: Stack con Map.svg abajo y este overlay arriba
+-->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="909" height="1123" viewBox="0 0 909 1123">
+  <title>Buses Overlay</title>
+  <desc>Capa de buses Busmetro (verde #42AE46) y Bus Urbano (azul #016FA0)</desc>
+  
+  <defs>
+    <style><![CDATA[
+      .bus-rect {
+        stroke: #FFFFFF;
+        stroke-width: 1;
+        opacity: 0.85;
+        rx: 3;
+        ry: 3;
+      }
+      .bus-rect:hover {
+        opacity: 1;
+        cursor: pointer;
+      }
+    ]]></style>
+  </defs>
+
+  <!-- Busmetro (verde #42AE46) -->
+  <g id="busmetro-layer">
+    <!-- <PM1: Derecha a Izquierda -->
+    <rect x="787" y="327" width="45" height="22" fill="#42AE46" class="bus-rect" 
+          id="busmetro-PM1" data-type="metro" data-name="PM1" data-direction="left">
+      <title>PM1 - Busmetro ←</title>
+    </rect>
+    
+    <!-- <S2: Derecha a Izquierda -->
+    <rect x="540" y="327" width="45" height="22" fill="#42AE46" class="bus-rect"
+          id="busmetro-S2" data-type="metro" data-name="S2" data-direction="left">
+      <title>S2 - Busmetro ←</title>
+    </rect>
+    
+    <!-- <S1: Derecha a Izquierda -->
+    <rect x="335" y="327" width="45" height="22" fill="#42AE46" class="bus-rect"
+          id="busmetro-S1" data-type="metro" data-name="S1" data-direction="left">
+      <title>S1 - Busmetro ←</title>
+    </rect>
+    
+    <!-- >PM2: Izquierda a Derecha -->
+    <rect x="122" y="996" width="45" height="22" fill="#42AE46" class="bus-rect"
+          id="busmetro-PM2" data-type="metro" data-name="PM2" data-direction="right">
+      <title>PM2 - Busmetro →</title>
+    </rect>
+    
+    <!-- *S5: Vertical (de abajo hacia arriba) -->
+    <rect x="809" y="651" width="22" height="45" fill="#42AE46" class="bus-rect"
+          id="busmetro-S5" data-type="metro" data-name="S5" data-direction="up">
+      <title>S5 - Busmetro ↑</title>
+    </rect>
+  </g>
+
+  <!-- Bus Urbano (azul #016FA0) -->
+  <g id="busurbano-layer">
+    <!-- <PU1: Derecha a Izquierda -->
+    <rect x="627" y="649" width="45" height="22" fill="#016FA0" class="bus-rect"
+          id="busurbano-PU1" data-type="urbano" data-name="PU1" data-direction="left">
+      <title>PU1 - Bus Urbano ←</title>
+    </rect>
+    
+    <!-- <S4: Derecha a Izquierda (primer carril) -->
+    <rect x="548" y="649" width="45" height="22" fill="#016FA0" class="bus-rect"
+          id="busurbano-S4-r1" data-type="urbano" data-name="S4" data-direction="left">
+      <title>S4 - Bus Urbano ← (carril 1)</title>
+    </rect>
+    
+    <!-- <S3: Derecha a Izquierda (primer carril) -->
+    <rect x="330" y="649" width="45" height="22" fill="#016FA0" class="bus-rect"
+          id="busurbano-S3-r1" data-type="urbano" data-name="S3" data-direction="left">
+      <title>S3 - Bus Urbano ← (carril 1)</title>
+    </rect>
+    
+    <!-- >PU2: Izquierda a Derecha -->
+    <rect x="253" y="674" width="45" height="22" fill="#016FA0" class="bus-rect"
+          id="busurbano-PU2" data-type="urbano" data-name="PU2" data-direction="right">
+      <title>PU2 - Bus Urbano →</title>
+    </rect>
+    
+    <!-- >S3: Izquierda a Derecha (segundo carril) -->
+    <rect x="330" y="674" width="45" height="22" fill="#016FA0" class="bus-rect"
+          id="busurbano-S3-r2" data-type="urbano" data-name="S3" data-direction="right">
+      <title>S3 - Bus Urbano → (carril 2)</title>
+    </rect>
+    
+    <!-- >S4: Izquierda a Derecha (segundo carril) -->
+    <rect x="548" y="674" width="45" height="22" fill="#016FA0" class="bus-rect"
+          id="busurbano-S4-r2" data-type="urbano" data-name="S4" data-direction="right">
+      <title>S4 - Bus Urbano → (carril 2)</title>
+    </rect>
+  </g>
+</svg>

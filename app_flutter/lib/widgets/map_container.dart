@@ -10,6 +10,8 @@ import '../models/traffic_light.dart';
 import '../models/bus_stop.dart';
 import 'bus_stop_eta_widget.dart';
 import 'eta_info_modal.dart';
+import 'moving_bus_widget.dart';
+import 'moving_urban_bus_widget.dart';
 
 class MapContainer extends StatefulWidget {
   const MapContainer({super.key});
@@ -346,11 +348,22 @@ class _MapContainerState extends State<MapContainer> {
                       boundaryMargin: const EdgeInsets.all(20),
                       child: Stack(
                         children: [
+                          // Mapa base
                           SvgPicture.string(
                             _svgContent,
                             fit: BoxFit.contain,
                             allowDrawingOutsideViewBox: true,
                           ),
+                          // Overlay de buses estáticos encima del mapa
+                          SvgPicture.asset(
+                            'assets/Map_buses_overlay.svg',
+                            fit: BoxFit.contain,
+                            allowDrawingOutsideViewBox: true,
+                          ),
+                          // Bus rojo animado recorriendo el circuito
+                          MovingBusWidget(stopSeconds: 3.0, maxSegmentSeconds: 0.9),
+                          // Bus urbano morado animado
+                          MovingUrbanBusWidget(stopSeconds: 3.0, maxSegmentSeconds: 0.9),
                           const BusStopsEtaOverlay(),
                         ],
                       ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/map_container.dart';
-import '../layouts/main_layout.dart';
+import '../layouts/modern_layout.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -12,6 +12,10 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
-    return MainLayout(title: 'Mapa Interactivo', child: const MapContainer());
+    return ModernLayout(
+      title: 'Mapa',
+      currentRoute: '/map',
+      child: const MapContainer(),
+    );
   }
 }

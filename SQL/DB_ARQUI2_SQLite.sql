@@ -156,6 +156,7 @@ CREATE INDEX IF NOT EXISTS IX_ActiveSensorGroupUrban_Time ON ActiveSensorGroupUr
 CREATE INDEX IF NOT EXISTS IX_BusPositionMetro_BusTime ON BusPositionMetro(bus_id, ts DESC);
 CREATE INDEX IF NOT EXISTS IX_BusPositionUrban_BusTime ON BusPositionUrban(bus_id, ts DESC);
 
+
 -- ============================================================
 -- VISTAS O CONSULTAS PARA EL FRONT
 -- ============================================================

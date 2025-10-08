@@ -14,6 +14,7 @@ import 'moving_urban_bus_widget.dart';
 import 'moving_bus_widget.dart'; // re-import after enabling sensorControlled
 import '../services/bus_position_service.dart'; // NUEVO
 import '../services/bus_progress_service.dart'; // NUEVO progreso entre paradas
+import '../config/app_theme.dart'; // Importar tema morado
 // import 'simple_sensor_controlled_metro_bus.dart'; // Reemplazado por MovingBusWidget sensorControlled
 
 // ---------------------------------------------------------------------------
@@ -27,12 +28,16 @@ import '../services/bus_progress_service.dart'; // NUEVO progreso entre paradas
 //   const Duration(milliseconds: 750)  // 0.75s más lento
 //   const Duration(seconds: 1)         // 1.0s por parada
 // NOTA: No necesitas modificar el widget; basta con cambiar aquí.
-const Duration kMetroPerStopAnimationDuration = Duration(milliseconds: 2000); // Duración entre paradas (metro)
+const Duration kMetroPerStopAnimationDuration = Duration(
+  milliseconds: 2000,
+); // Duración entre paradas (metro)
 
 // Configuración similar para el BUS URBANO (morado) cuando adopte modo discreto.
 // Edita este valor para cambiar cuánto dura cada salto entre paradas urbanas.
 // Mantener separado permite ajustar independientemente ambas rutas.
-const Duration kUrbanPerStopAnimationDuration = Duration(milliseconds: 2000); // Duración entre paradas (urbano)
+const Duration kUrbanPerStopAnimationDuration = Duration(
+  milliseconds: 2000,
+); // Duración entre paradas (urbano)
 
 class MapContainer extends StatefulWidget {
   const MapContainer({super.key});
@@ -75,7 +80,7 @@ class _MapContainerState extends State<MapContainer> {
     _setupBusPositionPolling(); // NUEVO
     // Inicializar barras de progreso (evitar 'Calculando...')
     final progress = BusProgressService.instance;
-    for (final stop in ['PM1','PM2','PU1','PU2']) {
+    for (final stop in ['PM1', 'PM2', 'PU1', 'PU2']) {
       progress.updateStopProgress(
         stopName: stop,
         progress: 0.0,
@@ -390,7 +395,7 @@ class _MapContainerState extends State<MapContainer> {
     final urbanText = _urbanPosText ?? '--';
 
     return Container(
-      color: Colors.grey[100],
+      decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
       width: double.infinity,
       height: double.infinity,
       child: Column(
@@ -424,15 +429,18 @@ class _MapContainerState extends State<MapContainer> {
                           // Bus rojo (metro) original ahora controlado por sensor stream (1s por segmento)
                           MovingBusWidget(
                             sensorControlled: true,
-                            sensorDiscreteStops: true, // modo saltos entre paradas
-                            segmentDuration: kMetroPerStopAnimationDuration, // TIEMPO POR PARADA (editar constante arriba)
+                            sensorDiscreteStops:
+                                true, // modo saltos entre paradas
+                            segmentDuration:
+                                kMetroPerStopAnimationDuration, // TIEMPO POR PARADA (editar constante arriba)
                             sensorStream: _busPositionService.metroStream,
                           ),
                           // Bus urbano morado animado
                           MovingUrbanBusWidget(
                             sensorControlled: true,
                             sensorDiscreteStops: true,
-                            segmentDuration: kUrbanPerStopAnimationDuration, // duración entre paradas urbano
+                            segmentDuration:
+                                kUrbanPerStopAnimationDuration, // duración entre paradas urbano
                             sensorStream: _busPositionService.urbanStream,
                             // Parámetros legacy ignorados en modo discreto pero mantenidos por compatibilidad
                             stopSeconds: 0.0,
@@ -447,60 +455,103 @@ class _MapContainerState extends State<MapContainer> {
                       right: 20,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          // Overlay NUEVO de posiciones
+                          // Overlay de posiciones con diseño morado
                           Container(
-                            width: 220,
-                            padding: const EdgeInsets.all(12),
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                              border: Border.all(color: const Color(0xFFE0E0E0)),
+                            constraints: const BoxConstraints(
+                              maxWidth: 200,
+                              maxHeight: 120,
                             ),
+                            padding: const EdgeInsets.all(AppTheme.spaceSmall),
+                            margin: const EdgeInsets.only(
+                              bottom: AppTheme.spaceSmall,
+                            ),
+                            decoration: AppTheme.glassDecoration,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text(
-                                  'Posiciones (1s)',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: AppTheme.purpleGradient,
+                                        borderRadius: BorderRadius.circular(
+                                          AppTheme.radiusSmall,
+                                        ),
+                                        boxShadow: AppTheme.neonShadow(
+                                          AppTheme.primaryPurple,
+                                          blur: 8,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Posiciones',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textPrimary,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: AppTheme.spaceXSmall),
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(Icons.directions_bus, size: 16, color: Colors.redAccent),
-                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.neonPink.withOpacity(
+                                          0.2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Icon(
+                                        Icons.directions_bus,
+                                        size: 12,
+                                        color: AppTheme.neonPink,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
                                         'Metro: $metroText',
-                                        style: const TextStyle(fontSize: 12),
+                                        style: AppTheme.bodySmall,
                                         overflow: TextOverflow.ellipsis,
                                         maxLines: 2,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 3),
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(Icons.directions_bus_filled, size: 16, color: Colors.deepPurple),
-                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryPurple
+                                            .withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Icon(
+                                        Icons.directions_bus_filled,
+                                        size: 12,
+                                        color: AppTheme.primaryPurple,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
                                         'Urbano: $urbanText',
-                                        style: const TextStyle(fontSize: 12),
+                                        style: AppTheme.bodySmall,
                                         overflow: TextOverflow.ellipsis,
                                         maxLines: 2,
                                       ),
@@ -511,57 +562,78 @@ class _MapContainerState extends State<MapContainer> {
                             ),
                           ),
                           Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: FloatingActionButton(
-                              heroTag: 'fabZoomIn',
-                              onPressed: _zoomIn,
-                              backgroundColor: Colors.blue[600],
-                              foregroundColor: Colors.white,
-                              mini: true,
-                              tooltip: 'Zoom In',
-                              child: const Icon(Icons.add, size: 20),
+                            margin: const EdgeInsets.only(bottom: 6),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.purpleGradient,
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusMedium,
+                                ),
+                                boxShadow: AppTheme.neonShadow(
+                                  AppTheme.primaryPurple,
+                                  blur: 10,
+                                ),
+                              ),
+                              child: FloatingActionButton(
+                                heroTag: 'fabZoomIn',
+                                onPressed: _zoomIn,
+                                backgroundColor: Colors.transparent,
+                                elevation: 0,
+                                foregroundColor: AppTheme.textPrimary,
+                                mini: true,
+                                tooltip: 'Zoom In',
+                                child: const Icon(Icons.add, size: 16),
+                              ),
                             ),
                           ),
                           Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: FloatingActionButton(
-                              heroTag: 'fabZoomOut',
-                              onPressed: _zoomOut,
-                              backgroundColor: Colors.blue[600],
-                              foregroundColor: Colors.white,
-                              mini: true,
-                              tooltip: 'Zoom Out',
-                              child: const Icon(Icons.remove, size: 20),
+                            margin: const EdgeInsets.only(bottom: 6),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.purpleGradient,
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusMedium,
+                                ),
+                                boxShadow: AppTheme.neonShadow(
+                                  AppTheme.primaryPurple,
+                                  blur: 10,
+                                ),
+                              ),
+                              child: FloatingActionButton(
+                                heroTag: 'fabZoomOut',
+                                onPressed: _zoomOut,
+                                backgroundColor: Colors.transparent,
+                                elevation: 0,
+                                foregroundColor: AppTheme.textPrimary,
+                                mini: true,
+                                tooltip: 'Zoom Out',
+                                child: const Icon(Icons.remove, size: 16),
+                              ),
                             ),
                           ),
-                          FloatingActionButton(
-                            heroTag: 'fabRefit',
-                            onPressed: _refitToWidth,
-                            backgroundColor: Colors.grey[700],
-                            foregroundColor: Colors.white,
-                            mini: true,
-                            tooltip: 'Ajustar al ancho',
-                            child: const Icon(Icons.fit_screen, size: 16),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.backgroundElevated,
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusMedium,
+                              ),
+                              border: Border.all(
+                                color: AppTheme.primaryPurple.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: FloatingActionButton(
+                              heroTag: 'fabRefit',
+                              onPressed: _refitToWidth,
+                              backgroundColor: Colors.transparent,
+                              elevation: 0,
+                              foregroundColor: AppTheme.textPrimary,
+                              mini: true,
+                              tooltip: 'Ajustar al ancho',
+                              child: const Icon(Icons.fit_screen, size: 14),
+                            ),
                           ),
                         ],
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 20,
-                      right: 20,
-                      child: FloatingActionButton.extended(
-                        heroTag: 'fabEtaInfo',
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => const EtaInfoModal(),
-                          );
-                        },
-                        backgroundColor: Colors.blue[600],
-                        foregroundColor: Colors.white,
-                        icon: const Icon(Icons.info_outline),
-                        label: const Text('Paradas'),
-                        tooltip: 'Ver información de paradas y ETA',
                       ),
                     ),
                   ],
@@ -569,60 +641,97 @@ class _MapContainerState extends State<MapContainer> {
               },
             ),
           ),
-          _BottomEtaPanel(busStopService: _busStopService),
+          _StopsDropdownPanel(busStopService: _busStopService),
         ],
       ),
     );
   }
 }
 
-class _BottomEtaPanel extends StatelessWidget {
+class _StopsDropdownPanel extends StatefulWidget {
   final BusStopService busStopService;
-  const _BottomEtaPanel({required this.busStopService});
+  const _StopsDropdownPanel({required this.busStopService});
+
+  @override
+  State<_StopsDropdownPanel> createState() => _StopsDropdownPanelState();
+}
+
+class _StopsDropdownPanelState extends State<_StopsDropdownPanel>
+    with SingleTickerProviderStateMixin {
+  bool _isExpanded = false;
+  late AnimationController _animationController;
+  late Animation<double> _expandAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _expandAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _toggleExpansion() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 140,
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.backgroundCard.withOpacity(0.95),
+            AppTheme.backgroundElevated.withOpacity(0.95),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: Border(
+          top: BorderSide(
+            color: AppTheme.primaryPurple.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
+            color: AppTheme.primaryPurple.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
           ),
         ],
-        border: const Border(top: BorderSide(color: Color(0xFFE0E0E0))),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            height: 110,
-            child: _ApproxProgressPanel(),
+          // Header del panel (siempre visible)
+          _StopsPanelHeader(
+            busStopService: widget.busStopService,
+            isExpanded: _isExpanded,
+            onToggle: _toggleExpansion,
           ),
-          SizedBox(
-            height: 30,
-            child: StreamBuilder<Map<String, BusStopEtaInfo>>(
-              stream: busStopService.busStopsStream,
-              builder: (context, snapshot) {
-                final stopsMap = snapshot.data ?? {};
-                if (stopsMap.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                final stops = stopsMap.values.toList()
-                  ..sort((a, b) => a.busStop.id.compareTo(b.busStop.id));
-                return ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: stops.length,
-                  itemBuilder: (context, index) => _EtaChip(info: stops[index]),
-                );
-              },
-            ),
+          // Contenido expandible
+          SizeTransition(
+            sizeFactor: _expandAnimation,
+            child: _StopsPanelContent(busStopService: widget.busStopService),
           ),
         ],
       ),
@@ -630,154 +739,266 @@ class _BottomEtaPanel extends StatelessWidget {
   }
 }
 
-class _ApproxProgressPanel extends StatelessWidget {
-  final List<String> _orderedStops = const ['PM1', 'PM2', 'PU1', 'PU2'];
-  const _ApproxProgressPanel();
+class _StopsPanelHeader extends StatelessWidget {
+  final BusStopService busStopService;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+
+  const _StopsPanelHeader({
+    required this.busStopService,
+    required this.isExpanded,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<StopApproachProgress>>(
-      stream: BusProgressService.instance.stream,
-      initialData: BusProgressService.instance.currentValues,
-      builder: (context, snapshot) {
-        final data = snapshot.data ?? BusProgressService.instance.currentValues;
-        final map = {for (final p in data) p.stopName: p};
-        return ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          itemCount: _orderedStops.length,
-          itemBuilder: (context, index) {
-            final name = _orderedStops[index];
-            final prog = map[name];
-            final progress = (prog?.progress ?? 0).clamp(0.0, 1.0);
-            final dist = prog?.remainingDistanceMeters ?? 0;
-            final eta = prog?.etaSeconds ?? 0;
-            final etaStr = eta <= 0 ? '--' : _formatEta(eta);
-            return Container(
-              width: 150,
-              margin: const EdgeInsets.only(right: 12),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEEEEEE)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  )
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      _ArrivalBadge(progress: progress),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      minHeight: 10,
-                      value: progress == 0 ? 0.02 : progress, // pequeño indicador inicial
-                      backgroundColor: const Color(0xFFF1F3F5),
-                      valueColor: AlwaysStoppedAnimation<Color>(_barColor(name)),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Dist: ${dist.toStringAsFixed(0)} m',
-                    style: const TextStyle(fontSize: 12, color: Colors.black87),
-                  ),
-                  Text(
-                    'ETA: $etaStr',
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  String _formatEta(double s) {
-    if (s < 60) {
-      return '${s.toStringAsFixed(1)}s';
-    }
-    final m = (s / 60).floor();
-    final rem = (s % 60).round();
-    return '${m}m ${rem}s';
-  }
-
-  Color _barColor(String stop) {
-    switch (stop) {
-      case 'PM1':
-        return Colors.redAccent;
-      case 'PM2':
-        return Colors.red;
-      case 'PU1':
-        return Colors.deepPurple;
-      case 'PU2':
-        return Colors.purple;
-      default:
-        return Colors.blueGrey;
-    }
-  }
-}
-
-class _ArrivalBadge extends StatelessWidget {
-  final double progress;
-  const _ArrivalBadge({required this.progress});
-  @override
-  Widget build(BuildContext context) {
-    final arrived = progress >= 0.999;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: arrived ? Colors.green[600] : Colors.grey[300],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        arrived ? 'Llegó' : '${(progress * 100).floor()}%',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: arrived ? Colors.white : Colors.black87,
+      padding: const EdgeInsets.all(AppTheme.spaceMedium),
+      child: InkWell(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            vertical: AppTheme.spaceMedium,
+            horizontal: AppTheme.spaceLarge,
+          ),
+          decoration: BoxDecoration(
+            color: AppTheme.backgroundCard,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+            border: Border.all(
+              color: AppTheme.primaryPurple.withOpacity(0.3),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryPurple.withOpacity(0.1),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Icono simplificado
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.purpleGradient,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                ),
+                child: const Icon(
+                  Icons.directions_bus,
+                  color: AppTheme.textPrimary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spaceMedium),
+              // Información simplificada
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Paradas de Transporte',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    StreamBuilder<Map<String, BusStopEtaInfo>>(
+                      stream: busStopService.busStopsStream,
+                      builder: (context, snapshot) {
+                        final stopsMap = snapshot.data ?? {};
+                        final activeStops = stopsMap.values
+                            .where(
+                              (info) =>
+                                  info.busStop.state == BusStopState.active,
+                            )
+                            .length;
+                        final totalStops = stopsMap.length;
+                        return Text(
+                          '$activeStops/$totalStops activas',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              // Indicador de estado
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryPurple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: AnimatedRotation(
+                  turns: isExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Icon(
+                    Icons.expand_more,
+                    color: AppTheme.primaryPurple,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _EtaChip extends StatelessWidget {
-  final BusStopEtaInfo info;
-  const _EtaChip({required this.info});
+class _StopsPanelContent extends StatelessWidget {
+  final BusStopService busStopService;
 
-  Color _statusColor(BusStopState state) {
-    switch (state) {
-      case BusStopState.active:
-        return Colors.green;
-      case BusStopState.busy:
-        return Colors.red;
-      case BusStopState.waiting:
-        return Colors.orange;
-      case BusStopState.inactive:
-        return Colors.grey;
+  const _StopsPanelContent({required this.busStopService});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 400),
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.spaceMedium),
+      child: Column(
+        children: [
+          // Panel de progreso compacto
+          _CompactProgressPanel(),
+          const SizedBox(height: AppTheme.spaceMedium),
+          // Lista de paradas con scroll
+          Expanded(
+            child: StreamBuilder<Map<String, BusStopEtaInfo>>(
+              stream: busStopService.busStopsStream,
+              builder: (context, snapshot) {
+                final stopsMap = snapshot.data ?? {};
+                if (stopsMap.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No hay información de paradas disponible',
+                      style: AppTheme.bodyMedium,
+                    ),
+                  );
+                }
+
+                final stops = stopsMap.values.toList()
+                  ..sort((a, b) => a.busStop.id.compareTo(b.busStop.id));
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: stops.length,
+                  itemBuilder: (context, index) =>
+                      _StopCard(info: stops[index]),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: AppTheme.spaceSmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactProgressPanel extends StatelessWidget {
+  final List<String> _orderedStops = const ['PM1', 'PM2', 'PU1', 'PU2'];
+  const _CompactProgressPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spaceSmall),
+      decoration: AppTheme.cardDecoration,
+      child: StreamBuilder<List<StopApproachProgress>>(
+        stream: BusProgressService.instance.stream,
+        initialData: BusProgressService.instance.currentValues,
+        builder: (context, snapshot) {
+          final data =
+              snapshot.data ?? BusProgressService.instance.currentValues;
+          final map = {for (final p in data) p.stopName: p};
+
+          return Row(
+            children: _orderedStops.map((name) {
+              final prog = map[name];
+              final progress = (prog?.progress ?? 0).clamp(0.0, 1.0);
+
+              return Expanded(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Column(
+                    children: [
+                      Text(
+                        _getStopDisplayName(name),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          minHeight: 6,
+                          value: progress == 0 ? 0.02 : progress,
+                          backgroundColor: AppTheme.greyDark,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _getStopColor(name),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+        },
+      ),
+    );
+  }
+
+  Color _getStopColor(String stop) {
+    switch (stop) {
+      case 'PM1':
+        return AppTheme.neonPink;
+      case 'PM2':
+        return AppTheme.neonOrange;
+      case 'PU1':
+        return AppTheme.primaryPurple;
+      case 'PU2':
+        return AppTheme.neonPurple;
+      default:
+        return AppTheme.neonCyan;
     }
   }
+
+  String _getStopDisplayName(String stop) {
+    switch (stop) {
+      case 'PM1':
+        return 'M1';
+      case 'PM2':
+        return 'M2';
+      case 'PU1':
+        return 'U1';
+      case 'PU2':
+        return 'U2';
+      default:
+        return stop;
+    }
+  }
+}
+
+class _StopCard extends StatelessWidget {
+  final BusStopEtaInfo info;
+  const _StopCard({required this.info});
 
   @override
   Widget build(BuildContext context) {
@@ -786,70 +1007,166 @@ class _EtaChip extends StatelessWidget {
     final minutos = (etaSeg / 60).floor();
     final segundos = etaSeg % 60;
     final etaStr = etaSeg == 0 ? '--' : '${minutos}m ${segundos}s';
+
     return Container(
-      width: 150,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      margin: const EdgeInsets.only(bottom: AppTheme.spaceSmall),
+      padding: const EdgeInsets.all(AppTheme.spaceMedium),
+      decoration: AppTheme.cardDecoration.copyWith(
+        border: Border.all(
+          color: _getStatusColor(info.busStop.state).withOpacity(0.3),
+          width: 1,
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Row(
         children: [
-          Row(
+          // Indicador de estado
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: _getStatusColor(info.busStop.state),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _getStatusColor(info.busStop.state).withOpacity(0.5),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppTheme.spaceMedium),
+          // Información de la parada
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      info.busStop.displayName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spaceSmall),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(
+                          info.busStop.state,
+                        ).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getStatusText(info.busStop.state),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: _getStatusColor(info.busStop.state),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                if (latest != null) ...[
+                  Text(
+                    'Tipo: ${latest.tipoTransporte}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                ],
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: AppTheme.textTertiary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'ETA: $etaStr',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: etaSeg > 0
+                            ? AppTheme.neonGreen
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Información adicional
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Container(
-                width: 10,
-                height: 10,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _statusColor(info.busStop.state),
-                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      _getStatusColor(info.busStop.state).withOpacity(0.2),
+                      _getStatusColor(info.busStop.state).withOpacity(0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  etaStr,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _getStatusColor(info.busStop.state),
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  info.busStop.displayName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              const SizedBox(height: 4),
+              Text(
+                _getStatusText(info.busStop.state),
+                style: TextStyle(fontSize: 10, color: AppTheme.textTertiary),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            'ETA',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[600],
-              letterSpacing: 0.5,
-            ),
-          ),
-            Text(
-              etaStr,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          if (latest != null)
-            Text(
-              latest.tipoTransporte,
-              style: TextStyle(fontSize: 11, color: Colors.grey[700]),
-              overflow: TextOverflow.ellipsis,
-            ),
         ],
       ),
     );
+  }
+
+  Color _getStatusColor(BusStopState state) {
+    switch (state) {
+      case BusStopState.active:
+        return AppTheme.neonGreen;
+      case BusStopState.busy:
+        return AppTheme.neonPink;
+      case BusStopState.waiting:
+        return AppTheme.neonYellow;
+      case BusStopState.inactive:
+        return AppTheme.greyMedium;
+    }
+  }
+
+  String _getStatusText(BusStopState state) {
+    switch (state) {
+      case BusStopState.active:
+        return 'Activa';
+      case BusStopState.busy:
+        return 'Ocupada';
+      case BusStopState.waiting:
+        return 'Esperando';
+      case BusStopState.inactive:
+        return 'Inactiva';
+    }
   }
 }

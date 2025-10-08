@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../layouts/main_layout.dart';
+import '../layouts/modern_layout.dart';
 
 /// Pantalla de información que muestra detalles sobre la aplicación.
 ///
@@ -13,8 +13,9 @@ class InfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MainLayout(
-      title: 'Información',
+    return ModernLayout(
+      title: 'Info',
+      currentRoute: '/info',
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(

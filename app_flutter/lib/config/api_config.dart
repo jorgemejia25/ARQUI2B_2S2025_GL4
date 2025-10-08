@@ -1,12 +1,8 @@
 /// Configuración centralizada de URLs para el API
 /// Sistema de Seguridad de Tráfico - Arquitectura de Software 2
 class ApiConfig {
-  // URLs de producción (Railway)
-  static const String _productionBaseUrl =
-      'https://arqui2b2s2025gl4-production.up.railway.app';
-
   // URLs de desarrollo local
-  static const String _localBaseUrl = 'http://localhost:8001';
+  static const String _localBaseUrl = 'http://192.168.1.158:8001';
 
   // URL actual (se puede cambiar dinámicamente)
   static String get baseUrl {
@@ -27,8 +23,10 @@ class ApiConfig {
       '$dashboardBaseUrl/charts/seismic';
   static String get dashboardHourlyStatsUrl => '$dashboardBaseUrl/stats/hourly';
   // NUEVOS: Endpoints posiciones de buses
-  static String get busPositionMetroUrl => '$dashboardBaseUrl/bus-position/metro';
-  static String get busPositionUrbanUrl => '$dashboardBaseUrl/bus-position/urban';
+  static String get busPositionMetroUrl =>
+      '$dashboardBaseUrl/bus-position/metro';
+  static String get busPositionUrbanUrl =>
+      '$dashboardBaseUrl/bus-position/urban';
 
   // Endpoints de alertas
   static String get alertsBaseUrl => '$baseUrl$apiV1Prefix/alerts';

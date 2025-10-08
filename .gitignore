@@ -74,3 +74,5 @@ node_modules/
 # Build artifacts
 *.tar.gz
 *.zip
+
+ia_modules/gallery/*

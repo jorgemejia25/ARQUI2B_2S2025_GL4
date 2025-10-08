@@ -6,6 +6,7 @@ import '../screens/notifications_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/qr_scanner_screen.dart';
 import '../screens/info_screen.dart';
+import '../screens/blacklist_screen.dart';
 
 /// Configuración de rutas de la aplicación usando go_router.
 ///
@@ -104,6 +105,16 @@ final GoRouter appRouter = GoRouter(
       path: '/info',
       name: 'info',
       builder: (context, state) => const InfoScreen(),
+    ),
+
+    /// Ruta de lista negra.
+    ///
+    /// Pantalla que muestra eventos de detección de personas
+    /// en lista negra con historial completo y filtros.
+    GoRoute(
+      path: '/blacklist',
+      name: 'blacklist',
+      builder: (context, state) => const BlacklistScreen(),
     ),
   ],
 );

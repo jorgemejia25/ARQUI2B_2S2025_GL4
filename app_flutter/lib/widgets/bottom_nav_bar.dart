@@ -71,20 +71,20 @@ class ModernBottomNavBar extends StatelessWidget {
               Expanded(
                 child: _buildNavItem(
                   context,
-                  icon: Icons.qr_code_scanner_rounded,
-                  label: isSmallScreen ? 'QR' : 'QR',
-                  route: '/qr-scanner',
-                  isActive: currentRoute == '/qr-scanner',
+                  icon: Icons.person_off_rounded,
+                  label: isSmallScreen ? 'Lista' : 'Lista Negra',
+                  route: '/blacklist',
+                  isActive: currentRoute == '/blacklist',
                   isSmallScreen: isSmallScreen,
                 ),
               ),
               Expanded(
                 child: _buildNavItem(
                   context,
-                  icon: Icons.info_rounded,
-                  label: isSmallScreen ? 'Info' : 'Info',
-                  route: '/info',
-                  isActive: currentRoute == '/info',
+                  icon: Icons.qr_code_scanner_rounded,
+                  label: isSmallScreen ? 'QR' : 'QR',
+                  route: '/qr-scanner',
+                  isActive: currentRoute == '/qr-scanner',
                   isSmallScreen: isSmallScreen,
                 ),
               ),

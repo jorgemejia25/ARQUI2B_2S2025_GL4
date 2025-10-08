@@ -212,5 +212,22 @@ FROM (SELECT 'RUTA_TRANSMETRO' as route_code, 'Parada1_Transmetro' as stop_name,
 JOIN Route r ON r.code = v.route_code
 JOIN Stop  s ON s.name = v.stop_name;
 
+-- ============================================================
+-- TABLA PARA EVENTOS DE LISTA NEGRA (RECONOCIMIENTO FACIAL)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS BlacklistEvent (
+  blacklist_event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts                 DATETIME NOT NULL DEFAULT (datetime('now')),
+  person_name        TEXT NOT NULL,
+  confidence         REAL NOT NULL,
+  distance           REAL NOT NULL,
+  camera_location    TEXT NULL
+);
+
+-- Índices para mejorar rendimiento de consultas
+CREATE INDEX IF NOT EXISTS IX_BlacklistEvent_Time ON BlacklistEvent(ts DESC);
+CREATE INDEX IF NOT EXISTS IX_BlacklistEvent_Person ON BlacklistEvent(person_name, ts DESC);
+
 -- Verificar que se crearon las tablas
 SELECT name FROM sqlite_master WHERE type='table';

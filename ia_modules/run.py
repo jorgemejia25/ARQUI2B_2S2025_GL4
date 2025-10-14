@@ -2,15 +2,53 @@
 AI Modules System - Main Runner
 Coordinates multiple AI modules with shared camera access
 """
+import os
+import sys
+
+# Ensure native backends see our env vars. If we haven't set the ready flag,
+# set the common vars and re-exec the Python process so C/C++ libraries start
+# with these variables already set. This prevents repeated NNPACK warnings.
+if os.environ.get("__IA_ENV_READY") != "1":
+    os.environ.setdefault("GLOG_minloglevel", "3")
+    os.environ.setdefault("CAFFE2_LOG_LEVEL", "3")
+    os.environ.setdefault("TORCH_CPP_LOG_LEVEL", "ERROR")
+    os.environ.setdefault("CLOG_LOG_LEVEL", "3")
+    os.environ.setdefault("NNPACK_LOG_LEVEL", "3")
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ["__IA_ENV_READY"] = "1"
+    # Re-exec Python with the same argv to ensure native libs pick up env
+    os.execve(sys.executable, [sys.executable] + sys.argv, os.environ)
+
 import argparse
 import cv2
 import signal
-import sys
 import time
 from typing import Optional
 
+class _OnceNNPACKFilter:
+    """Intercept stderr to print NNPACK warning only once"""
+    def __init__(self, stream):
+        self._stream = stream
+        self._printed_nnpack = False
+    def write(self, s):
+        try:
+            if "Could not initialize NNPACK!" in s:
+                if self._printed_nnpack:
+                    return
+                self._printed_nnpack = True
+        except Exception:
+            pass
+        return self._stream.write(s)
+    def flush(self):
+        return self._stream.flush()
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+# Install filter early
+sys.stderr = _OnceNNPACKFilter(sys.stderr)
+
 from core import SharedCamera, ModuleManager
-from modules import FaceRecognitionModule
+from modules import FaceRecognitionModule, WeaponDetectionModule
 
 
 class AISystem:
@@ -54,10 +92,13 @@ class AISystem:
         # Initialize module manager
         self.manager = ModuleManager(self.camera)
         
-        # Add face recognition module
+        # Add face recognition module (don't abort if it fails)
         if not self._setup_face_recognition():
-            print("[System] Failed to setup face recognition")
-            return False
+            print("[System] Warning: Failed to setup face recognition, continuing without it")
+
+        # Add weapon detection module (YOLO)
+        if not self._setup_weapon_detection():
+            print("[System] Warning: Failed to setup weapon detection, continuing without it")
         
         # Print status
         self.manager.print_status()
@@ -81,6 +122,25 @@ class AISystem:
         
         face_module = FaceRecognitionModule(config)
         return self.manager.add_module(face_module)
+
+    def _setup_weapon_detection(self) -> bool:
+        """Setup weapon detection (YOLOv8) module"""
+        # Try to use trained weights if present; otherwise fallback happens inside module
+        config = {
+            "weights_path": "models/weapons/best.pt",  # preferred relative location
+            "api_url": "http://localhost:8001/api/v1/weapon-detections",
+            "cooldown": 5,  # seconds
+            "camera_location": "Main Camera",
+            "conf": self.args.yolo_conf,
+            "imgsz": self.args.yolo_imgsz,
+            "detect_every": self.args.yolo_detect_every,
+            "gap": self.args.yolo_gap,
+            "update_interval": self.args.yolo_update_interval,
+            "real_width_cm": self.args.yolo_real_width_cm,
+            "assume_first_dist_cm": self.args.yolo_assume_first_dist_cm,
+        }
+        weapon_module = WeaponDetectionModule(config)
+        return self.manager.add_module(weapon_module)
     
     def run(self):
         """Main processing loop"""
@@ -176,6 +236,23 @@ Examples:
     face_group.add_argument('--detect-every', type=int, default=3,
                            help='Process every N frames (default: 3)')
     
+    # Weapon detection (YOLO) settings
+    yolo_group = parser.add_argument_group('Weapon Detection (YOLO) Settings')
+    yolo_group.add_argument('--yolo-conf', type=float, default=0.25,
+                            help='YOLO confidence threshold (default: 0.25)')
+    yolo_group.add_argument('--yolo-imgsz', type=int, default=416,
+                            help='YOLO image size (default: 416)')
+    yolo_group.add_argument('--yolo-detect-every', type=int, default=1,
+                            help='Process every N frames for YOLO (default: 1)')
+    yolo_group.add_argument('--yolo-gap', type=int, default=3,
+                            help='Frames without detection before marking class absent (default: 3)')
+    yolo_group.add_argument('--yolo-update-interval', type=float, default=2.0,
+                            help='Seconds between TOP prints (default: 2.0)')
+    yolo_group.add_argument('--yolo-real-width-cm', type=float, default=None,
+                            help='Real object width in cm (for distance in cm)')
+    yolo_group.add_argument('--yolo-assume-first-dist-cm', type=float, default=None,
+                            help='Assume first occurrence is at this distance (cm) to auto-calibrate per class')
+
     return parser.parse_args()
 
 

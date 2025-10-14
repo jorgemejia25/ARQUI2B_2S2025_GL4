@@ -4,6 +4,8 @@ class ApiConfig {
   // URLs de desarrollo local
   static const String _localBaseUrl = 'http://192.168.1.158:8001';
 
+  //DANT: local HOST ME FUNCIONA probar si no te funciona
+
   // URL actual (se puede cambiar dinámicamente)
   static String get baseUrl {
     // En una implementación real, esto se obtendría del ConfigService

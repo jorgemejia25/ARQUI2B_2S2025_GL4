@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../layouts/main_layout.dart';
+import '../layouts/modern_layout.dart';
 
 class QRScannerScreen extends StatefulWidget {
   const QRScannerScreen({super.key});
@@ -104,8 +104,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     final Uri? url = _toUri(lastValue);
     final bool canOpen = url != null;
 
-    return MainLayout(
-      title: 'Escáner QR',
+    return ModernLayout(
+      title: 'QR',
+      currentRoute: '/qr-scanner',
       child: Column(
         children: [
           const SizedBox(height: 12),

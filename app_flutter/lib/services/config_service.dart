@@ -30,10 +30,10 @@ class ConfigService {
 
     switch (_currentEnvironment) {
       case 'production':
-        return 'http://localhost:8001';
+        return 'http://192.168.1.158:8001';
       case 'development':
       default:
-        return 'http://localhost:8001';
+        return 'http://192.168.1.158:8001';
     }
   }
 

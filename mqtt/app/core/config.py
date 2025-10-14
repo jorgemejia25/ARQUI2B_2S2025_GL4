@@ -1,55 +1,76 @@
 """
-Application configuration management
-Centralizes all configuration settings
+MQTT Bridge configuration management
+Centralizes all configuration settings for the Arduino MQTT Bridge
 """
 
 import os
-from typing import Optional
+from typing import List
 from pydantic_settings import BaseSettings
+
+
+class AppSettings(BaseSettings):
+    """Application settings for the MQTT Bridge"""
+    
+    # Application Configuration
+    APP_NAME: str = "Arduino MQTT Bridge"
+    APP_VERSION: str = "1.0.0"
+    DEBUG: bool = False
+    
+    # Simulation Configuration
+    SIMULATION_INTERVAL: float = 2.0  # Seconds between simulation messages
+    
+    # Serial Configuration
+    SERIAL_PORT: str = "/dev/ttyUSB0"  # Default Arduino port
+    SERIAL_BAUDRATE: int = 9600
+    SERIAL_TIMEOUT: float = 5.0
+    
+    # Logging Configuration
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+
+class MQTTSettings(BaseSettings):
+    """MQTT-specific settings"""
+    
+    # MQTT Broker Configuration
+    BROKER: str = "localhost"
+    PORT: int = 1883
+    USERNAME: str = ""
+    PASSWORD: str = ""
+    
+    # MQTT Topics
+    TOPIC: str = "arduino/data"
+    TOPIC_INFRACTIONS: str = "arduino/data/infracciones"
+    
+    # MQTT Connection Settings
+    KEEPALIVE: int = 60
+    CONNECT_TIMEOUT: int = 10
+    CLIENT_ID: str = "arduino_bridge"
+    
+    # Message Settings
+    QOS: int = 1
+    RETAIN: bool = False
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
 
 
 class SerialSettings(BaseSettings):
     """Serial communication settings"""
     
-    PORT: str = "/dev/cu.usbserial-110"
-    BAUDRATE: int = 115200
-    TIMEOUT: int = 2
+    # Serial Port Configuration
+    SERIAL_PORT: str = "/dev/ttyUSB0"
+    SERIAL_BAUDRATE: int = 9600
+    SERIAL_TIMEOUT: float = 5.0
     
-    class Config:
-        env_prefix = "SERIAL_"
-        case_sensitive = True
-
-
-class MQTTSettings(BaseSettings):
-    """MQTT broker settings"""
-    
-    BROKER: str = "localhost"
-    PORT: int = 1883
-    USERNAME: str = "jorge"
-    PASSWORD: str = "34eikykmbd8w5igpjiebialeisx0yu02"
-    TOPIC: str = "arduino/data"
-    TOPIC_INFRACTIONS: str = "arduino/data/infracciones"
-    CLIENT_ID: str = "arduino_mqtt_bridge"
-    QOS: int = 1
-    RETAIN: bool = False
-    
-    class Config:
-        env_prefix = "MQTT_"
-        case_sensitive = True
-
-
-class ApplicationSettings(BaseSettings):
-    """Application settings"""
-    
-    APP_NAME: str = "Arduino MQTT Bridge"
-    APP_VERSION: str = "1.0.0"
-    DEBUG: bool = False
-    LOG_LEVEL: str = "INFO"
-    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
-    # Simulation mode
-    SIMULATION_MODE: bool = False
-    SIMULATION_INTERVAL: float = 2.0
+    # Data Processing Settings
+    JSON_TIMEOUT: float = 5.0
+    BUFFER_SIZE: int = 1024
     
     class Config:
         env_file = ".env"
@@ -57,7 +78,6 @@ class ApplicationSettings(BaseSettings):
 
 
 # Global settings instances
-serial_settings = SerialSettings()
+app_settings = AppSettings()
 mqtt_settings = MQTTSettings()
-app_settings = ApplicationSettings()
-
+serial_settings = SerialSettings()

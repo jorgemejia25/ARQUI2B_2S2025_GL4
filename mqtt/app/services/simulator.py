@@ -126,3 +126,11 @@ class ArduinoSimulator:
                 return "ROJO"
         return "ROJO"
 
+
+
+
+
+
+
+
+

@@ -65,5 +65,22 @@ async def websocket_stops(
         logger.info("Stop WebSocket disconnected")
 
 
+@router.websocket("/ws/blacklist")
+async def websocket_blacklist(
+    websocket: WebSocket,
+    ws_service: WebSocketService = Depends(get_websocket_service)
+):
+    """WebSocket endpoint for blacklist events"""
+    await ws_service.connect(websocket, "blacklist")
+    
+    try:
+        while True:
+            data = await websocket.receive_text()
+            logger.debug(f"Received from blacklist client: {data}")
+    except WebSocketDisconnect:
+        ws_service.disconnect(websocket, "blacklist")
+        logger.info("Blacklist WebSocket disconnected")
+
+
 
 

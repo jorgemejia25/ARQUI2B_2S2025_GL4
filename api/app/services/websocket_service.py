@@ -21,6 +21,7 @@ class WebSocketService:
             "alerts": set(),
             "traffic": set(),
             "stops": set(),
+            "blacklist": set(),
             "general": set()
         }
     
@@ -93,6 +94,10 @@ class WebSocketService:
     async def emit_stop_update(self, stop_data: Dict):
         """Emit stop update to stop connections"""
         await self.broadcast(stop_data, "stops")
+    
+    async def emit_blacklist_event(self, blacklist_data: Dict):
+        """Emit blacklist event to blacklist connections"""
+        await self.broadcast(blacklist_data, "blacklist")
     
     def get_connection_count(self, connection_type: str = None) -> int:
         """Get number of active connections"""

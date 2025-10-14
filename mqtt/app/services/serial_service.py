@@ -137,3 +137,11 @@ class SerialService:
         """Context manager exit"""
         self.disconnect()
 
+
+
+
+
+
+
+
+

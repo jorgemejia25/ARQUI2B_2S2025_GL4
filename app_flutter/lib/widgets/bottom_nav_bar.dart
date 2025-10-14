@@ -10,6 +10,9 @@ class ModernBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
+
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.backgroundCard,
@@ -30,46 +33,60 @@ class ModernBottomNavBar extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppTheme.spaceMedium,
+            horizontal: AppTheme.spaceSmall,
             vertical: AppTheme.spaceSmall,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(
-                context,
-                icon: Icons.dashboard_rounded,
-                label: 'Dashboard',
-                route: '/dashboard',
-                isActive: currentRoute == '/dashboard',
+              Expanded(
+                child: _buildNavItem(
+                  context,
+                  icon: Icons.dashboard_rounded,
+                  label: isSmallScreen ? 'Dash' : 'Dashboard',
+                  route: '/dashboard',
+                  isActive: currentRoute == '/dashboard',
+                  isSmallScreen: isSmallScreen,
+                ),
               ),
-              _buildNavItem(
-                context,
-                icon: Icons.notifications_rounded,
-                label: 'Alertas',
-                route: '/notifications',
-                isActive: currentRoute == '/notifications',
+              Expanded(
+                child: _buildNavItem(
+                  context,
+                  icon: Icons.notifications_rounded,
+                  label: isSmallScreen ? 'Alertas' : 'Alertas',
+                  route: '/notifications',
+                  isActive: currentRoute == '/notifications',
+                  isSmallScreen: isSmallScreen,
+                ),
               ),
-              _buildNavItem(
-                context,
-                icon: Icons.map_rounded,
-                label: 'Mapa',
-                route: '/map',
-                isActive: currentRoute == '/map',
+              Expanded(
+                child: _buildNavItem(
+                  context,
+                  icon: Icons.map_rounded,
+                  label: isSmallScreen ? 'Mapa' : 'Mapa',
+                  route: '/map',
+                  isActive: currentRoute == '/map',
+                  isSmallScreen: isSmallScreen,
+                ),
               ),
-              _buildNavItem(
-                context,
-                icon: Icons.qr_code_scanner_rounded,
-                label: 'QR',
-                route: '/qr-scanner',
-                isActive: currentRoute == '/qr-scanner',
+              Expanded(
+                child: _buildNavItem(
+                  context,
+                  icon: Icons.person_off_rounded,
+                  label: isSmallScreen ? 'Lista' : 'Lista Negra',
+                  route: '/blacklist',
+                  isActive: currentRoute == '/blacklist',
+                  isSmallScreen: isSmallScreen,
+                ),
               ),
-              _buildNavItem(
-                context,
-                icon: Icons.info_rounded,
-                label: 'Info',
-                route: '/info',
-                isActive: currentRoute == '/info',
+              Expanded(
+                child: _buildNavItem(
+                  context,
+                  icon: Icons.qr_code_scanner_rounded,
+                  label: isSmallScreen ? 'QR' : 'QR',
+                  route: '/qr-scanner',
+                  isActive: currentRoute == '/qr-scanner',
+                  isSmallScreen: isSmallScreen,
+                ),
               ),
             ],
           ),
@@ -84,13 +101,16 @@ class ModernBottomNavBar extends StatelessWidget {
     required String label,
     required String route,
     required bool isActive,
+    bool isSmallScreen = false,
   }) {
     return GestureDetector(
       onTap: () => context.go(route),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTheme.spaceMedium,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen
+              ? AppTheme.spaceXSmall
+              : AppTheme.spaceSmall,
           vertical: AppTheme.spaceSmall,
         ),
         decoration: BoxDecoration(
@@ -110,7 +130,7 @@ class ModernBottomNavBar extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: isActive
                     ? AppTheme.primaryPurple.withOpacity(0.2)
@@ -119,20 +139,25 @@ class ModernBottomNavBar extends StatelessWidget {
               ),
               child: Icon(
                 icon,
-                size: 20,
+                size: isSmallScreen ? 16 : 18,
                 color: isActive
                     ? AppTheme.primaryPurple
                     : AppTheme.textSecondary,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: AppTheme.caption.copyWith(
-                color: isActive
-                    ? AppTheme.primaryPurple
-                    : AppTheme.textSecondary,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+            const SizedBox(height: 2),
+            Flexible(
+              child: Text(
+                label,
+                style: AppTheme.caption.copyWith(
+                  color: isActive
+                      ? AppTheme.primaryPurple
+                      : AppTheme.textSecondary,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  fontSize: isSmallScreen ? 10 : 11,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
           ],

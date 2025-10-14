@@ -83,4 +83,22 @@ async def websocket_blacklist(
 
 
 
+@router.websocket("/ws/weapons")
+async def websocket_weapons(
+    websocket: WebSocket,
+    ws_service: WebSocketService = Depends(get_websocket_service)
+):
+    """WebSocket endpoint for weapon detection events"""
+    await ws_service.connect(websocket, "weapon")
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            logger.debug(f"Received from weapons client: {data}")
+    except WebSocketDisconnect:
+        ws_service.disconnect(websocket, "weapon")
+        logger.info("Weapons WebSocket disconnected")
+
+
+
 

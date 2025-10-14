@@ -231,3 +231,33 @@ CREATE INDEX IF NOT EXISTS IX_BlacklistEvent_Person ON BlacklistEvent(person_nam
 
 -- Verificar que se crearon las tablas
 SELECT name FROM sqlite_master WHERE type='table';
+
+
+-- ============================================================
+-- TABLES FOR WEAPON DETECTIONS
+-- ============================================================
+
+-- Table for weapon detection events
+CREATE TABLE IF NOT EXISTS weaponDetections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  ts DATETIME NOT NULL DEFAULT (datetime('now')),
+  distance REAL NOT NULL,
+  camera_location TEXT NULL
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS IX_weaponDetections_Time ON weaponDetections(ts DESC);
+CREATE INDEX IF NOT EXISTS IX_weaponDetections_Name ON weaponDetections(name, ts DESC);
+
+-- Table for weapon counts (easier to maintain and query top N)
+CREATE TABLE IF NOT EXISTS weaponCounts (
+  name TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 0
+);
+
+-- Index for fast queries by count descending
+CREATE INDEX IF NOT EXISTS IX_weaponCounts_Count ON weaponCounts(count DESC);
+
+-- Verify tables were created
+SELECT name FROM sqlite_master WHERE type='table';

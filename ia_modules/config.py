@@ -14,6 +14,7 @@ class Config:
     # API endpoints
     API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8001")
     BLACKLIST_ENDPOINT = f"{API_BASE_URL}/api/v1/blacklist-events"
+    WEAPON_ENDPOINT = f"{API_BASE_URL}/api/v1/weapon-detections"
     
     # Camera defaults
     DEFAULT_CAMERA_ID = 0

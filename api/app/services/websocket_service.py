@@ -22,6 +22,7 @@ class WebSocketService:
             "traffic": set(),
             "stops": set(),
             "blacklist": set(),
+            "weapon": set(),
             "general": set()
         }
     

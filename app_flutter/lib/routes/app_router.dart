@@ -7,6 +7,7 @@ import '../screens/map_screen.dart';
 import '../screens/qr_scanner_screen.dart';
 import '../screens/info_screen.dart';
 import '../screens/blacklist_screen.dart';
+import '../screens/weapons_screen.dart';
 
 /// Configuración de rutas de la aplicación usando go_router.
 ///
@@ -115,6 +116,16 @@ final GoRouter appRouter = GoRouter(
       path: '/blacklist',
       name: 'blacklist',
       builder: (context, state) => const BlacklistScreen(),
+    ),
+
+    /// Ruta de armas blancas.
+    ///
+    /// Pantalla que muestra eventos de detección de armas blancas
+    /// con historial completo y top por frecuencia.
+    GoRoute(
+      path: '/weapons',
+      name: 'weapons',
+      builder: (context, state) => const WeaponsScreen(),
     ),
   ],
 );

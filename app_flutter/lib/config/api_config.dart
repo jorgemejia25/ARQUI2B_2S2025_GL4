@@ -2,7 +2,7 @@
 /// Sistema de Seguridad de Tráfico - Arquitectura de Software 2
 class ApiConfig {
   // URLs de desarrollo local
-  static const String _localBaseUrl = 'http://192.168.1.158:8001';
+  static const String _localBaseUrl = 'http://192.168.1.16:8001';
 
   // URL actual (se puede cambiar dinámicamente)
   static String get baseUrl {

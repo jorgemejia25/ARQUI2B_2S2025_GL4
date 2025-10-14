@@ -229,5 +229,23 @@ CREATE TABLE IF NOT EXISTS BlacklistEvent (
 CREATE INDEX IF NOT EXISTS IX_BlacklistEvent_Time ON BlacklistEvent(ts DESC);
 CREATE INDEX IF NOT EXISTS IX_BlacklistEvent_Person ON BlacklistEvent(person_name, ts DESC);
 
+-- ============================================================
+-- TABLA PARA EVENTOS DE DETECCIÓN DE PLACAS VEHICULARES
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS PlateEvent (
+  plate_event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts             DATETIME NOT NULL DEFAULT (datetime('now')),
+  plate_text     TEXT NOT NULL,
+  confidence     REAL NOT NULL,
+  camera_location TEXT NULL,
+  image_base64   TEXT NULL
+);
+
+-- Índices para mejorar rendimiento de consultas
+CREATE INDEX IF NOT EXISTS IX_PlateEvent_Time ON PlateEvent(ts DESC);
+CREATE INDEX IF NOT EXISTS IX_PlateEvent_Text ON PlateEvent(plate_text, ts DESC);
+
+
 -- Verificar que se crearon las tablas
 SELECT name FROM sqlite_master WHERE type='table';

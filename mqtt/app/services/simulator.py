@@ -5,7 +5,7 @@ Generates simulated Arduino data for testing without hardware
 
 import time
 import random
-from typing import Dict, Any
+from typing import Dict, Any, List
 from app.models.arduino_data import ArduinoData, GasSensor, PanicButton, ETAInfo, SeismicEvent
 from app.core.logging import get_logger
 
@@ -48,26 +48,13 @@ class ArduinoSimulator:
         
         # Generate gas sensors
         gas_sensors = [
-            GasSensor(
-                zone="Z1",
-                ppm=random.randint(150, 250),
-                is_high=False
-            ),
-            GasSensor(
-                zone="Z2",
-                ppm=random.randint(150, 250),
-                is_high=False
-            )
+            GasSensor(zone="Z1", ppm=random.randint(150, 250), is_high=False),
+            GasSensor(zone="Z2", ppm=random.randint(150, 250), is_high=False)
         ]
         
         # Generate panic buttons (usually inactive)
         panic_buttons = [
-            PanicButton(
-                id=f"PB{i}",
-                active=False,
-                button_id=str(i),
-                location=f"Parada {i}"
-            )
+            PanicButton(id=f"PB{i}", active=False, button_id=str(i), location=f"Parada {i}")
             for i in range(1, 5)
         ]
         
@@ -93,6 +80,16 @@ class ArduinoSimulator:
                     info=f"{'TU' if transport_type == 'Transurbano' else 'M'},ETA_S={tiempo},FROM={origin},TO={parada}"
                 ))
         
+        # ==========================================
+        # Simular infracciones aleatorias
+        # ==========================================
+        infractions: List[str] = []
+        if random.random() < 0.05:  # 5% chance per cycle
+            semaforo_infractor = random.choice(list(traffic_lights.keys()))
+            infractions.append(semaforo_infractor)
+            logger.warning(f" Simulación: vehículo se pasó en rojo en {semaforo_infractor}")
+
+        # Return full ArduinoData structure
         return ArduinoData(
             timestamp=str(int(self.simulation_time * 1000)),
             traffic_lights=traffic_lights,
@@ -100,7 +97,7 @@ class ArduinoSimulator:
             gas_sensors=gas_sensors,
             panic_buttons=panic_buttons,
             eta_info=eta_info,
-            infractions=[],
+            infractions=infractions,  
             seismic_event=None,
             has_earthquake=False
         )
@@ -125,12 +122,3 @@ class ArduinoSimulator:
             else:
                 return "ROJO"
         return "ROJO"
-
-
-
-
-
-
-
-
-

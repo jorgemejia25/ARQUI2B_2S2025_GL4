@@ -7,6 +7,7 @@ import '../screens/map_screen.dart';
 import '../screens/qr_scanner_screen.dart';
 import '../screens/info_screen.dart';
 import '../screens/blacklist_screen.dart';
+import '../screens/plate_detection_screen.dart';
 
 /// Configuración de rutas de la aplicación usando go_router.
 ///
@@ -116,5 +117,11 @@ final GoRouter appRouter = GoRouter(
       name: 'blacklist',
       builder: (context, state) => const BlacklistScreen(),
     ),
+
+    GoRoute(
+      path: '/plates',
+      name: 'plates',
+      builder: (context, state) => const PlateDetectionScreen(),
+    ),    
   ],
 );

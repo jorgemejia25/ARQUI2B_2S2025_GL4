@@ -8,6 +8,7 @@ import '../screens/qr_scanner_screen.dart';
 import '../screens/info_screen.dart';
 import '../screens/blacklist_screen.dart';
 import '../screens/weapons_screen.dart';
+import '../screens/plate_detection_screen.dart';
 
 /// Configuración de rutas de la aplicación usando go_router.
 ///
@@ -127,5 +128,11 @@ final GoRouter appRouter = GoRouter(
       name: 'weapons',
       builder: (context, state) => const WeaponsScreen(),
     ),
+
+    GoRoute(
+      path: '/plates',
+      name: 'plates',
+      builder: (context, state) => const PlateDetectionScreen(),
+    ),    
   ],
 );

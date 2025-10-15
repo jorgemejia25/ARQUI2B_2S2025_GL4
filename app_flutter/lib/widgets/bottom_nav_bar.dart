@@ -79,6 +79,16 @@ class ModernBottomNavBar extends StatelessWidget {
                 ),
               ),
               Expanded(
+              child: _buildNavItem(
+                context,
+                icon: Icons.directions_car_filled_rounded,
+                label: isSmallScreen ? 'Placas' : 'Placas',
+                route: '/plates',
+                isActive: currentRoute == '/plates',
+                isSmallScreen: isSmallScreen,
+                ),
+              ),
+              Expanded(
                 child: _buildNavItem(
                   context,
                   icon: Icons.gavel_rounded,

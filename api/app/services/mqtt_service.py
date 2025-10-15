@@ -79,6 +79,29 @@ class MQTTService:
                     logger.warning(f"Failed to save data: {topic}")
             except Exception as e:
                 logger.error(f"Database save error: {e}")
+
+            # Detectar infracción y notificar a la IA
+            if topic == "arduino/data/infracciones":
+                from datetime import datetime
+                import requests
+
+                DETECTOR_URL = "http://localhost:5001/api/deteccion"
+                
+                signal_id = payload.get("signal_id", "Desconocido")
+                payload_trigger = {
+                    "tipo_evento": "infraccion_detectada",
+                    "ubicacion": signal_id,
+                    "timestamp": datetime.now().isoformat()
+                }
+
+
+                try:
+                    logger.info("Infracción detectada — enviando evento al servicio de detección de placas...")
+                    response = requests.post(DETECTOR_URL, json=payload_trigger, timeout=5)
+                    logger.info(f"Respuesta IA ({response.status_code}): {response.text}")
+                except Exception as e:
+                    logger.error(f"Error enviando evento a detección de placas: {e}")
+
             
             # Emit via WebSocket if manager is available
             if self.websocket_manager:

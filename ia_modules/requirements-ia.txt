@@ -4,24 +4,37 @@
 # Face Recognition
 #-----------------
 
+# ==============================
+# IA MODULES - FULL DEPENDENCIES
+# ==============================
+
+# Base scientific stack
 numpy>=1.21.0
 opencv-python>=4.5.0
-face-recognition>=1.3.0
-git+https://github.com/ageitgey/face_recognition_models
 requests>=2.25.0
 
-# Dependencias adicionales que pueden ser necesarias
-# dlib (se instala automáticamente con face-recognition)
-# cmake (herramienta del sistema para compilar dlib)
-# pkg-config (herramienta del sistema para compilar dlib)
+# OCR and deep learning
+easyocr>=1.7.1
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.1.0
 
 #--------------
 # IA ARMAS
 #--------------
+# Face recognition
+dlib>=19.24.0
+face-recognition>=1.3.0
+face-recognition-models>=0.3.0
 
 ultralytics>=8.1.0,<9
 torch>=2.1.0,<3
 # opencv-python>=4.7.0,<5
 # numpy>=1.23.0,<3
+# Image utilities
+Pillow>=9.0.0
 
 # las otras Dependencias estan comentadas porque ya se instalaron pero si hay problemas / actualizar a las Dependencias a la versión puesta.
+# Optional performance packages
+scipy>=1.10.0
+tqdm>=4.66.0

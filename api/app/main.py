@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
 from app.api.endpoints import health, alerts, websockets, dashboard, blacklist, weapon
+from app.api.endpoints import health, alerts, websockets, dashboard, blacklist, plate_events
 from app.api.dependencies import get_mqtt_service, get_websocket_service
 from app.db.connection import DatabaseConnection
 
@@ -107,6 +108,7 @@ app.include_router(alerts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
 app.include_router(blacklist.router, prefix=settings.API_V1_PREFIX)
 app.include_router(weapon.router, prefix=settings.API_V1_PREFIX)
+app.include_router(plate_events.router, prefix=settings.API_V1_PREFIX)
 app.include_router(websockets.router)
 
 

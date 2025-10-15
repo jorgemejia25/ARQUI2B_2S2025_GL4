@@ -48,7 +48,44 @@ class _OnceNNPACKFilter:
 sys.stderr = _OnceNNPACKFilter(sys.stderr)
 
 from core import SharedCamera, ModuleManager
+from modules import FaceRecognitionModule, PlateDetectionModule
 from modules import FaceRecognitionModule, WeaponDetectionModule
+
+# PARA LA DETECCION DE PLACAS CUANDO HAYA INFRACCION
+import threading
+from fastapi import FastAPI, Request
+import uvicorn
+import asyncio
+from core.trigger_state import capture_next_plate
+
+
+def start_trigger_server():
+    app = FastAPI()
+
+    @app.post("/api/deteccion")
+    async def trigger_detection(request: Request):
+        from core import trigger_state
+        data = await request.json()
+        tipo_evento = data.get("tipo_evento")
+        ubicacion = data.get("ubicacion", "Entrada Principal")
+
+        if tipo_evento == "infraccion_detectada":
+            trigger_state.capture_next_plate = True
+            trigger_state.last_location = ubicacion 
+            print(f"[Trigger] Infracción detectada en {ubicacion} → activando detección de placa.")
+            return {"status": "ok", "message": f"Trigger recibido para {ubicacion}"}
+        return {"status": "ignored"}
+
+
+    config = uvicorn.Config(app, host="0.0.0.0", port=5001, log_level="warning")
+    server = uvicorn.Server(config)
+    asyncio.run(server.serve())
+
+# Lanzar el servidor en segundo plano al iniciar el sistema
+def launch_trigger_thread():
+    thread = threading.Thread(target=start_trigger_server, daemon=True)
+    thread.start()
+    print("[Trigger] Servidor de detección iniciado en puerto 5001")
 
 
 class AISystem:
@@ -60,6 +97,7 @@ class AISystem:
         self.manager: Optional[ModuleManager] = None
         self.running = False
         self.show_display = True
+        self.selected_module = None
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._handle_shutdown)
@@ -76,6 +114,18 @@ class AISystem:
         print("="*70)
         print("AI MODULES SYSTEM")
         print("="*70)
+        print("Select which module to run:")
+        print("  1) Face Recognition")
+        print("  2) Plate Detection")
+        choice = input("Enter choice (1 or 2): ").strip()
+
+        if choice == "1":
+            self.selected_module = "face_recognition"
+        elif choice == "2":
+            self.selected_module = "plate_detection"
+        else:
+            print("Invalid option. Exiting.")
+            return False
         
         # Initialize camera
         self.camera = SharedCamera(
@@ -92,6 +142,15 @@ class AISystem:
         # Initialize module manager
         self.manager = ModuleManager(self.camera)
         
+        # Select which module to load
+        if self.selected_module == "face_recognition":
+            if not self._setup_face_recognition():
+                print("[System] Failed to setup face recognition")
+                return False
+        elif self.selected_module == "plate_detection":
+            if not self._setup_plate_detection():
+                print("[System] Failed to setup plate detection")
+                return False
         # Add face recognition module (don't abort if it fails)
         if not self._setup_face_recognition():
             print("[System] Warning: Failed to setup face recognition, continuing without it")
@@ -142,10 +201,27 @@ class AISystem:
         weapon_module = WeaponDetectionModule(config)
         return self.manager.add_module(weapon_module)
     
+    def _setup_plate_detection(self) -> bool:
+        """Setup plate detection module"""
+        config = {
+            "api_url": "http://localhost:8001/api/v1/plate-events",
+            "confidence_threshold": 0.45,
+            "camera_location": "Entrada Principal",
+            "events_dir": "events",
+            "cooldown": 6
+        }
+
+        plate_module = PlateDetectionModule(config)
+        return self.manager.add_module(plate_module)
+    
     def run(self):
         """Main processing loop"""
         frame_id = 0
-        window_name = "AI Modules System"
+        window_name = (
+            "AI Modules System - Face Recognition"
+            if self.selected_module == "face_recognition"
+            else "AI Modules System - Plate Detection"
+        )
         
         while self.running:
             # Read frame from camera
@@ -224,8 +300,7 @@ Examples:
                              help='Target FPS (default: 30)')
     camera_group.add_argument('--width', type=int, default=640,
                              help='Frame width (default: 640)')
-    camera_group.add_argument('--height', type=int, default=480,
-                             help='Frame height (default: 480)')
+    camera_group.add_argument('--height', type=int, default=480)
     
     # Face recognition settings
     face_group = parser.add_argument_group('Face Recognition Settings')
@@ -260,10 +335,16 @@ def main():
     """Main entry point"""
     try:
         args = parse_arguments()
+
+        launch_trigger_thread()
         
         # Create and start system
         system = AISystem(args)
-        
+
+        time.sleep(2)
+        print("[Trigger] Servidor de detección listo para recibir eventos.")
+
+
         if not system.start():
             print("[Main] Failed to start system")
             return 1

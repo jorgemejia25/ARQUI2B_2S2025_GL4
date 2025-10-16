@@ -29,17 +29,55 @@ class PlateDetectionModule(BaseModule):
         self.camera_location = config.get("camera_location", "Entrada Principal")
         self.last_detection_time = 0
 
-        # Only OCR reader
-        self.reader = easyocr.Reader(['en'])
+        # Initialize OCR reader with SSL workaround
+        self.reader = None
+        self._init_ocr_reader()
+
+    def _init_ocr_reader(self):
+        """Initialize OCR reader with SSL certificate workaround"""
+        try:
+            import ssl
+            import urllib.request
+            
+            # Create SSL context that doesn't verify certificates
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            # Monkey patch urllib to use our SSL context
+            original_urlopen = urllib.request.urlopen
+            def patched_urlopen(*args, **kwargs):
+                if 'context' not in kwargs:
+                    kwargs['context'] = ssl_context
+                return original_urlopen(*args, **kwargs)
+            urllib.request.urlopen = patched_urlopen
+            
+            # Now try to initialize EasyOCR
+            self.reader = easyocr.Reader(['en'])
+            print(f"[{self.name}] EasyOCR initialized successfully")
+            
+        except Exception as e:
+            print(f"[{self.name}] Warning: Failed to initialize EasyOCR: {e}")
+            print(f"[{self.name}] Plate detection will be disabled")
+            self.reader = None
 
     def setup(self) -> bool:
         """Setup OCR"""
-        print(f"[{self.name}] EasyOCR initialized (no YOLO model).")
-        return True
+        if self.reader is not None:
+            print(f"[{self.name}] EasyOCR initialized successfully")
+            return True
+        else:
+            print(f"[{self.name}] EasyOCR not available - plate detection disabled")
+            return False
 
     def process(self, frame: np.ndarray, frame_id: int) -> Dict[str, Any]:
         """Detect any readable text as a plate"""
         results = {"detections": [], "frame_id": frame_id}
+        
+        # If OCR reader is not available, return empty results
+        if self.reader is None:
+            return results
+            
         current_time = time.time()
 
         # Cooldown: avoid flooding the API

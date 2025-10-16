@@ -112,23 +112,13 @@ class AISystem:
     def start(self) -> bool:
         """Initialize and start the AI system"""
         print("="*70)
-        print("AI MODULES SYSTEM")
+        print("AI MODULES SYSTEM - ALL MODULES")
         print("="*70)
-        print("Select which module to run:")
-        print("  1) Face Recognition")
-        print("  2) Plate Detection")
-        print("  3) Weapons Detection")
-        choice = input("Enter choice (1, 2 or 3): ").strip()
-
-        if choice == "1":
-            self.selected_module = "face_recognition"
-        elif choice == "2":
-            self.selected_module = "plate_detection"
-        elif choice == "3":
-            self.selected_module = "weapons_detection"
-        else:
-            print("Invalid option. Exiting.")
-            return False
+        print("Loading all AI modules simultaneously:")
+        print("  - Face Recognition")
+        print("  - Plate Detection") 
+        print("  - Weapons Detection")
+        print("="*70)
         
         # Initialize camera
         self.camera = SharedCamera(
@@ -145,29 +135,45 @@ class AISystem:
         # Initialize module manager
         self.manager = ModuleManager(self.camera)
         
-        # Select which module to load
-        if self.selected_module == "face_recognition":
-            if not self._setup_face_recognition():
-                print("[System] Failed to setup face recognition")
-                return False
-        elif self.selected_module == "plate_detection":
-            if not self._setup_plate_detection():
-                print("[System] Failed to setup plate detection")
-                return False
-        # Add face recognition module (don't abort if it fails)
-        if not self._setup_face_recognition():
+        # Load all modules simultaneously
+        # Performance optimizations: 
+        # - Face recognition processes every 5 frames
+        # - Weapon detection processes every 3 frames with limited image size
+        # - Plate detection has cooldown to prevent API flooding
+        modules_loaded = 0
+        
+        # Add face recognition module
+        if self._setup_face_recognition():
+            modules_loaded += 1
+            print("[System] Face recognition module loaded successfully")
+        else:
             print("[System] Warning: Failed to setup face recognition, continuing without it")
 
-        # Add weapon detection module (YOLO)
-        if not self._setup_weapon_detection():
+        # Add plate detection module
+        if self._setup_plate_detection():
+            modules_loaded += 1
+            print("[System] Plate detection module loaded successfully")
+        else:
+            print("[System] Warning: Failed to setup plate detection, continuing without it")
+
+        # Add weapon detection module
+        if self._setup_weapon_detection():
+            modules_loaded += 1
+            print("[System] Weapon detection module loaded successfully")
+        else:
             print("[System] Warning: Failed to setup weapon detection, continuing without it")
+        
+        if modules_loaded == 0:
+            print("[System] Error: No modules could be loaded")
+            return False
         
         # Print status
         self.manager.print_status()
         
         self.running = True
-        print("[System] System ready!")
+        print(f"[System] System ready with {modules_loaded} modules!")
         print("[System] Controls: ESC=quit | S=status | D=toggle display")
+        print("[System] All modules are processing frames simultaneously")
         
         return True
     
@@ -177,7 +183,7 @@ class AISystem:
             "gallery_dir": "gallery",
             "api_url": "http://localhost:8001/api/v1/blacklist-events",
             "threshold": self.args.threshold,
-            "detect_every": self.args.detect_every,
+            "detect_every": max(5, self.args.detect_every),  # Process every 5 frames for better performance
             "cooldown": self.args.cooldown,
             "camera_location": "Main Camera"
         }
@@ -194,8 +200,8 @@ class AISystem:
             "cooldown": 5,  # seconds
             "camera_location": "Main Camera",
             "conf": self.args.yolo_conf,
-            "imgsz": self.args.yolo_imgsz,
-            "detect_every": self.args.yolo_detect_every,
+            "imgsz": min(416, self.args.yolo_imgsz),  # Limit image size for better performance
+            "detect_every": max(3, self.args.yolo_detect_every),  # Process every 3 frames
             "gap": self.args.yolo_gap,
             "update_interval": self.args.yolo_update_interval,
             "real_width_cm": self.args.yolo_real_width_cm,
@@ -220,13 +226,7 @@ class AISystem:
     def run(self):
         """Main processing loop"""
         frame_id = 0
-        window_name = (
-            "AI Modules System - Face Recognition"
-            if self.selected_module == "face_recognition"
-            else "AI Modules System - Plate Detection"
-            if self.selected_module == "plate_detection"
-            else "AI Modules System - Weapons Detection"
-        )
+        window_name = "AI Modules System - All Modules"
         
         while self.running:
             # Read frame from camera

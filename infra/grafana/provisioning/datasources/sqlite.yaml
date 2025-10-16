@@ -1,0 +1,21 @@
+apiVersion: 1
+
+deleteDatasources:
+  - name: IoT ARQUI2
+    orgId: 1
+
+# Define default SQLite datasource used by all dashboards
+# Requires plugin frser-sqlite-datasource (already set in docker-compose)
+datasources:
+  - name: IoT ARQUI2
+    uid: iot-sqlite
+    type: frser-sqlite-datasource
+    access: proxy
+    isDefault: true
+    editable: false
+    orgId: 1
+    jsonData:
+      path: /var/lib/grafana/databases/iot.db
+      allowTransformedNulls: false
+      sslmode: "disable"
+    secureJsonData: {}

@@ -91,6 +91,24 @@ CREATE TABLE IF NOT EXISTS GasEvent (
   FOREIGN KEY (alert_id) REFERENCES Alert(alert_id) ON DELETE CASCADE
 );
 
+-- Eventos de robo (detección de lista negra)
+CREATE TABLE IF NOT EXISTS RobberyEvent (
+  alert_id       INTEGER PRIMARY KEY,
+  person_name    TEXT NOT NULL,
+  confidence     REAL NOT NULL,
+  camera_location TEXT NOT NULL,
+  FOREIGN KEY (alert_id) REFERENCES Alert(alert_id) ON DELETE CASCADE
+);
+
+-- Eventos de detección de armas
+CREATE TABLE IF NOT EXISTS WeaponEvent (
+  alert_id       INTEGER PRIMARY KEY,
+  weapon_type    TEXT NOT NULL,
+  confidence     REAL NOT NULL,
+  camera_location TEXT NOT NULL,
+  FOREIGN KEY (alert_id) REFERENCES Alert(alert_id) ON DELETE CASCADE
+);
+
 -- Series históricas para gráficas
 CREATE TABLE IF NOT EXISTS GasMeasurement (
   gas_id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -173,7 +191,9 @@ INSERT OR IGNORE INTO AlertType (code, description, severity_base) VALUES
   ('INFRACCION', 'Infracción de tráfico (semáforo)', 3),
   ('PANICO',     'Botón de pánico',                  3),
   ('SISMO',      'Evento sísmico',                   3),
-  ('GAS',        'Fuga de gas',                      3);
+  ('GAS',        'Fuga de gas',                      3),
+  ('ROBO',       'Detección de persona en lista negra', 4),
+  ('ARMA',       'Detección de arma blanca',         4);
 
 -- Rutas
 INSERT OR IGNORE INTO Route (code, name) VALUES

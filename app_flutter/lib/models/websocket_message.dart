@@ -236,6 +236,8 @@ enum AlertType {
   gasAlert, // GAS_ALERT
   seismicAlert, // SEISMIC_ALERT, SISMO
   signalUpdate, // SIGNAL_UPDATE (cuando venga como alerta genérica)
+  robo, // ALERTA ROBO
+  arma, // ALERTA ARMA
   unknown;
 
   static AlertType fromString(String? raw) {
@@ -268,6 +270,10 @@ enum AlertType {
         return 'Alerta sísmica';
       case AlertType.signalUpdate:
         return 'Actualización de señal';
+      case AlertType.robo:
+        return 'Alerta de robo';
+      case AlertType.arma:
+        return 'Alerta de arma';
       case AlertType.unknown:
         return 'Alerta';
     }
@@ -324,6 +330,10 @@ extension AlertDataView on AlertData {
         return 'Alerta sísmica';
       case AlertType.signalUpdate:
         return 'Actualización de señal';
+      case AlertType.robo:
+        return 'Alerta de robo';
+      case AlertType.arma:
+        return 'Alerta de arma';
       case AlertType.unknown:
         return 'Alerta';
     }

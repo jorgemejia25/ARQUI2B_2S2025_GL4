@@ -145,6 +145,8 @@ class _AlertsFeedState extends State<AlertsFeed> {
             Icons.sync_alt,
             AppTheme.primaryPurple,
           ),
+          chip(AlertType.robo, 'Robo', Icons.warning, AppTheme.error),
+          chip(AlertType.arma, 'Arma', Icons.gavel, AppTheme.neonPink),
         ],
       ),
     );
@@ -346,6 +348,10 @@ class _AlertCard extends StatelessWidget {
         return Icons.co2;
       case AlertType.signalUpdate:
         return Icons.sync_alt;
+      case AlertType.robo:
+        return Icons.warning;
+      case AlertType.arma:
+        return Icons.gavel;
       case AlertType.unknown:
         return Icons.notification_important;
     }

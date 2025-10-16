@@ -179,7 +179,7 @@ class AISystem:
             "threshold": self.args.threshold,
             "detect_every": self.args.detect_every,
             "cooldown": self.args.cooldown,
-            "camera_location": "Main Camera"
+            "camera_location": str(self.args.camera)
         }
         
         face_module = FaceRecognitionModule(config)
@@ -192,7 +192,7 @@ class AISystem:
             "weights_path": "models/weapons/best.pt",  # preferred relative location
             "api_url": "http://localhost:8001/api/v1/weapon-detections",
             "cooldown": 5,  # seconds
-            "camera_location": "Main Camera",
+            "camera_location": str(self.args.camera),
             "conf": self.args.yolo_conf,
             "imgsz": self.args.yolo_imgsz,
             "detect_every": self.args.yolo_detect_every,
@@ -209,7 +209,7 @@ class AISystem:
         config = {
             "api_url": "http://localhost:8001/api/v1/plate-events",
             "confidence_threshold": 0.45,
-            "camera_location": "Entrada Principal",
+            "camera_location": str(self.args.camera),
             "events_dir": "events",
             "cooldown": 6
         }

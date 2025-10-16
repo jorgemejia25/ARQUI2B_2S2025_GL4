@@ -61,6 +61,16 @@ async def create_weapon_detection(
                 status_code=500,
                 detail="Failed to save weapon detection"
             )
+        
+        # Create alert for weapon detection
+        alert_data = {
+            "alert_type": "ARMA",
+            "severity": 4,
+            "weapon_type": event.name,
+            "confidence": 0.8,  # Default confidence for weapon detection
+            "camera_location": event.camera_location
+        }
+        alert_id = alert_repo.create_alert(alert_data)
 
         # Prepare response data directly from input
         event_response = WeaponDetectionResponse(

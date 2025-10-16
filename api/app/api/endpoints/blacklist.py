@@ -60,6 +60,16 @@ async def create_blacklist_event(
                 detail="Failed to save blacklist event"
             )
         
+        # Create alert for robbery detection
+        alert_data = {
+            "alert_type": "ROBO",
+            "severity": 4,
+            "person_name": event.person_name,
+            "confidence": event.confidence,
+            "camera_location": event.camera_location
+        }
+        alert_id = alert_repo.create_alert(alert_data)
+        
         # Prepare response data directly from input
         event_response = BlacklistEventResponse(
             blacklist_event_id=event_id,

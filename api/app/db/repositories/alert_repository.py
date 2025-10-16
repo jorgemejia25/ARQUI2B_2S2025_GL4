@@ -51,21 +51,19 @@ class AlertRepository(BaseRepository):
         """
         return self.execute_query(query, (alert_type_code, limit)) or []
     
-    def create_alert(
-        self, 
-        alert_type_code: str, 
-        severity: int,
-        bus_id: Optional[int] = None,
-        stop_id: Optional[int] = None
-    ) -> bool:
-        """Create a new alert"""
-        # Get alert type ID
+    def create_alert(self, alert_data: Dict[str, Any]) -> int:
+        """Create a new alert with specific data"""
+        alert_type_code = alert_data.get("alert_type")
+        severity = alert_data.get("severity", 3)
+        bus_id = alert_data.get("bus_id")
+        stop_id = alert_data.get("stop_id")
+        
+        # Get alert_type_id
         type_query = "SELECT alert_type_id FROM AlertType WHERE code = ?"
         type_result = self.execute_query(type_query, (alert_type_code,))
         
         if not type_result:
-            logger.error(f"Alert type not found: {alert_type_code}")
-            return False
+            raise ValueError(f"Unknown alert type: {alert_type_code}")
         
         alert_type_id = type_result[0]["alert_type_id"]
         
@@ -74,14 +72,40 @@ class AlertRepository(BaseRepository):
         INSERT INTO Alert (ts, alert_type_id, severity, bus_id, stop_id)
         VALUES (datetime('now'), ?, ?, ?, ?)
         """
-        result = self.execute_query(alert_query, (alert_type_id, severity, bus_id, stop_id))
+        self.execute_query(alert_query, (alert_type_id, severity, bus_id, stop_id))
         
-        if result is None:
-            logger.info(f"Alert created: type={alert_type_code}, severity={severity}")
-            return True
-        else:
-            logger.error("Failed to create alert")
-            return False
+        # Get the inserted alert_id
+        last_id_query = "SELECT last_insert_rowid() as alert_id"
+        result = self.execute_query(last_id_query)
+        alert_id = result[0]["alert_id"] if result else None
+        
+        # Insert specific event data if provided
+        if alert_type_code == "ROBO" and "person_name" in alert_data:
+            robbery_query = """
+            INSERT INTO RobberyEvent (alert_id, person_name, confidence, camera_location)
+            VALUES (?, ?, ?, ?)
+            """
+            self.execute_query(robbery_query, (
+                alert_id,
+                alert_data.get("person_name"),
+                alert_data.get("confidence", 0.0),
+                alert_data.get("camera_location")
+            ))
+        
+        elif alert_type_code == "ARMA" and "weapon_type" in alert_data:
+            weapon_query = """
+            INSERT INTO WeaponEvent (alert_id, weapon_type, confidence, camera_location)
+            VALUES (?, ?, ?, ?)
+            """
+            self.execute_query(weapon_query, (
+                alert_id,
+                alert_data.get("weapon_type"),
+                alert_data.get("confidence", 0.0),
+                alert_data.get("camera_location")
+            ))
+        
+        logger.info(f"Alert created: id={alert_id}, type={alert_type_code}")
+        return alert_id
     
     def get_alert_types(self) -> List[Dict[str, Any]]:
         """Get all alert types"""

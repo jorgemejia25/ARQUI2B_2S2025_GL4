@@ -345,6 +345,10 @@ class _AlertCard extends StatelessWidget {
         return Icons.air_rounded;
       case AlertType.signalUpdate:
         return Icons.traffic_rounded;
+      case AlertType.robo:
+        return Icons.warning_rounded;
+      case AlertType.arma:
+        return Icons.gavel_rounded;
       case AlertType.unknown:
         return Icons.help_rounded;
     }

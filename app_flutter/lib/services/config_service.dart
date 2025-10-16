@@ -30,10 +30,10 @@ class ConfigService {
 
     switch (_currentEnvironment) {
       case 'production':
-        return 'http://192.168.1.158:8001';
+        return 'http://172.20.10.8:8001';
       case 'development':
       default:
-        return 'http://192.168.1.158:8001';
+        return 'http://172.20.10.8:8001';
     }
   }
 

@@ -117,12 +117,15 @@ class AISystem:
         print("Select which module to run:")
         print("  1) Face Recognition")
         print("  2) Plate Detection")
-        choice = input("Enter choice (1 or 2): ").strip()
+        print("  3) Weapons Detection")
+        choice = input("Enter choice (1, 2 or 3): ").strip()
 
         if choice == "1":
             self.selected_module = "face_recognition"
         elif choice == "2":
             self.selected_module = "plate_detection"
+        elif choice == "3":
+            self.selected_module = "weapons_detection"
         else:
             print("Invalid option. Exiting.")
             return False
@@ -221,6 +224,8 @@ class AISystem:
             "AI Modules System - Face Recognition"
             if self.selected_module == "face_recognition"
             else "AI Modules System - Plate Detection"
+            if self.selected_module == "plate_detection"
+            else "AI Modules System - Weapons Detection"
         )
         
         while self.running:

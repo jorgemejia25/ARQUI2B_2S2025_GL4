@@ -17,7 +17,8 @@ from app.schemas.blacklist_schemas import (
     BlacklistEventsResponse
 )
 from app.services.websocket_service import WebSocketService
-from app.api.dependencies import get_websocket_service
+from app.api.dependencies import get_websocket_service, get_serial_service
+from app.services.serial_service import APISerialService
 
 logger = get_logger(__name__)
 
@@ -34,7 +35,8 @@ def get_blacklist_repository() -> BlacklistRepository:
 async def create_blacklist_event(
     event: BlacklistEventCreate,
     repository: BlacklistRepository = Depends(get_blacklist_repository),
-    websocket_service: WebSocketService = Depends(get_websocket_service)
+    websocket_service: WebSocketService = Depends(get_websocket_service),
+    serial_service: APISerialService = Depends(get_serial_service)
 ):
     """
     Create a new blacklist event
@@ -84,6 +86,12 @@ async def create_blacklist_event(
         }
         
         await websocket_service.broadcast(websocket_data, "blacklist")
+
+        # Send alert to Arduino over serial (type: ROSTRO)
+        serial_payload = f"ALERTA,ROSTRO,persona={event.person_name},conf={event.confidence:.2f},dist={event.distance:.2f},cam={event.camera_location}"
+        sent = serial_service.send_line(serial_payload)
+        if not sent:
+            logger.warning("Failed to send blacklist alert over serial")
         logger.info(f"Blacklist event broadcasted via WebSocket: {event.person_name}")
         
         return event_response

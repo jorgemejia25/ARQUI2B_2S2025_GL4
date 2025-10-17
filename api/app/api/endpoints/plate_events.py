@@ -17,7 +17,8 @@ from app.schemas.plate_schemas import (
     PlateEventsResponse
 )
 from app.services.websocket_service import WebSocketService
-from app.api.dependencies import get_websocket_service
+from app.api.dependencies import get_websocket_service, get_serial_service
+from app.services.serial_service import APISerialService
 
 logger = get_logger(__name__)
 
@@ -34,7 +35,8 @@ def get_plate_repository() -> PlateRepository:
 async def create_plate_event(
     event: PlateEventCreate,
     repository: PlateRepository = Depends(get_plate_repository),
-    websocket_service: WebSocketService = Depends(get_websocket_service)
+    websocket_service: WebSocketService = Depends(get_websocket_service),
+    serial_service: APISerialService = Depends(get_serial_service)
 ):
     """
     Create a new vehicle plate detection event.
@@ -79,6 +81,14 @@ async def create_plate_event(
         }
 
         await websocket_service.broadcast(websocket_data, "plates")
+
+        # Send alert to Arduino over serial (type: PLACA)
+        serial_payload = (
+            f"ALERTA,PLACA,placa={event.plate_text},conf={event.confidence:.2f},cam={event.camera_location}"
+        )
+        sent = serial_service.send_line(serial_payload)
+        if not sent:
+            logger.warning("Failed to send plate alert over serial")
         logger.info(f"Plate event broadcasted: {event.plate_text}")
 
         return event_response

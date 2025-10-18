@@ -30,7 +30,7 @@ class BusStopWebSocketService {
   String get _url {
     final configService = ConfigService.instance;
     return configService.getServiceUrls()['wsStops'] ??
-        'ws://192.168.1.158:8001/ws/stops';
+        'ws://172.20.10.8:8001/ws/stops';
   }
 
   /// Conectar al WebSocket de paradas

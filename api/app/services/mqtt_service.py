@@ -13,17 +13,25 @@ from app.core.logging import get_logger
 from app.db.connection import DatabaseConnection
 from app.db.repositories.mqtt_repository import MQTTRepository
 
-logger = get_logger(__name__)
+logger = get_logger(_name_)
 
 
 class MQTTService:
     """Service for MQTT operations"""
     
-    def __init__(self, websocket_manager=None):
+    def _init_(self, websocket_manager=None):
         self.broker = settings.MQTT_BROKER
         self.port = settings.MQTT_PORT
         self.topics = settings.MQTT_TOPICS
         self.client = mqtt.Client()
+        try:
+            self.client.enable_logger(logger)
+        except Exception:
+            pass
+        try:
+            self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+        except Exception:
+            pass
         self.received_data = []
         self.websocket_manager = websocket_manager
         
@@ -40,14 +48,30 @@ class MQTTService:
         """Callback when connected to MQTT broker"""
         logger.info(f"Connected to MQTT broker: code={rc}")
         
+        # Print visible de conexión exitosa
+        print("\n" + "+"*80)
+        print("API CONECTADO AL BROKER MQTT")
+        print("+"*80)
+        print(f"Broker: {self.broker}:{self.port}")
+        print(f"Codigo de conexion: {rc}")
+        
         # Subscribe to all topics
         for topic in self.topics:
             client.subscribe(topic)
+            print(f"  - Suscrito a: {topic}")
             logger.info(f"Subscribed to topic: {topic}")
         
         # Subscribe to new sensor topic
         client.subscribe("arduino/data/sensors")
+        print(f"  - Suscrito a: arduino/data/sensors")
         logger.info(f"Subscribed to topic: arduino/data/sensors")
+        
+        # Subscribe to panic button topic
+        client.subscribe("arduino/data/panic")
+        print(f"  - Suscrito a: arduino/data/panic")
+        logger.info(f"Subscribed to topic: arduino/data/panic")
+        
+        print("+"*80 + "\n")
     
     def on_message(self, client, userdata, msg):
         """Callback when message is received"""
@@ -65,6 +89,23 @@ class MQTTService:
             
             # Add to received data list
             self.received_data.append(data_received)
+            
+            # Print JSON recibido en consola de forma visible
+            print("\n" + "="*80)
+            print("JSON RECIBIDO DESDE MQTT")
+            print("="*80)
+            print(f"Topico: {topic}")
+            print(f"Timestamp: {data_received['timestamp']:.2f}")
+            print(f"JSON Payload:")
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            
+            # Destacar si hay infracciones en el JSON principal
+            if topic == "arduino/data" and "infracciones" in payload:
+                infracciones = payload.get("infracciones", [])
+                if infracciones:
+                    print(f"\n>>> INFRACCIONES DETECTADAS EN JSON: {infracciones} <<<")
+            
+            print("="*80 + "\n")
             
             # Log received data
             logger.info(f"MQTT data received - Topic: {topic}")
@@ -85,6 +126,16 @@ class MQTTService:
                 from datetime import datetime
                 import requests
 
+                # Print destacado para infracciones
+                print("\n" + "!"*80)
+                print("INFRACCION DETECTADA")
+                print("!"*80)
+                print(f"Signal ID: {payload.get('signal_id', 'Desconocido')}")
+                print(f"Severidad: {payload.get('severity', 'N/A')}")
+                print(f"Tipo de alerta: {payload.get('alert_type', 'INFRACCION')}")
+                print(f"Origen: {payload.get('origen', 'N/A')}")
+                print("!"*80 + "\n")
+
                 DETECTOR_URL = "http://localhost:5001/api/deteccion"
                 
                 signal_id = payload.get("signal_id", "Desconocido")
@@ -101,6 +152,53 @@ class MQTTService:
                     logger.info(f"Respuesta IA ({response.status_code}): {response.text}")
                 except Exception as e:
                     logger.error(f"Error enviando evento a detección de placas: {e}")
+            
+            # Detectar botón de pánico
+            elif topic == "arduino/data/panic":
+                # Print destacado para botones de pánico
+                print("\n" + "@"*80)
+                print("ALERTA DE BOTON DE PANICO ACTIVADO")
+                print("@"*80)
+                print(f"Button ID: {payload.get('button_id', 'Desconocido')}")
+                print(f"Ubicacion: {payload.get('location', 'N/A')}")
+                print(f"Severidad: {payload.get('severity', 'N/A')}")
+                print(f"Tipo de alerta: {payload.get('alert_type', 'PANIC_BUTTON')}")
+                print(f"Origen: {payload.get('origen', 'N/A')}")
+                print(f"Timestamp: {payload.get('timestamp', 'N/A')}")
+                print("@"*80 + "\n")
+                
+                logger.warning(f"PANIC BUTTON ALERT: {payload.get('button_id')} at {payload.get('location')}")
+            
+            # Detectar alertas de SISMO y GAS en el topic principal
+            elif topic == "arduino/data":
+                alert_type = payload.get("alert_type", "")
+                
+                if alert_type == "SISMO":
+                    # Print destacado para sismo
+                    print("\n" + "~"*80)
+                    print("ALERTA DE SISMO DETECTADO")
+                    print("~"*80)
+                    print(f"Magnitud: {payload.get('seismic_intensity', 'N/A')}")
+                    print(f"Umbral: {payload.get('threshold_g', 'N/A')} G")
+                    print(f"Origen: {payload.get('origen', 'N/A')}")
+                    print(f"Severidad: {payload.get('severity', 'N/A')}")
+                    print("~"*80 + "\n")
+                    
+                    logger.warning(f"SEISMIC ALERT: magnitude={payload.get('seismic_intensity')} from {payload.get('origen')}")
+                
+                elif alert_type == "GAS":
+                    # Print destacado para gas/humo
+                    print("\n" + "#"*80)
+                    print("ALERTA DE GAS/HUMO DETECTADO")
+                    print("#"*80)
+                    print(f"Zona: {payload.get('zona', 'N/A')}")
+                    print(f"PPM: {payload.get('gas_ppm', 'N/A')}")
+                    print(f"Umbral: {payload.get('threshold_ppm', 'N/A')}")
+                    print(f"Origen: {payload.get('origen', 'N/A')}")
+                    print(f"Severidad: {payload.get('severity', 'N/A')}")
+                    print("#"*80 + "\n")
+                    
+                    logger.warning(f"GAS ALERT: zone={payload.get('zona')}, ppm={payload.get('gas_ppm')}")
 
             
             # Emit via WebSocket if manager is available
@@ -148,7 +246,19 @@ class MQTTService:
                 logger.info(f"Configuring MQTT authentication: {settings.MQTT_USERNAME}")
                 self.client.username_pw_set(settings.MQTT_USERNAME, settings.MQTT_PASSWORD)
             
-            self.client.connect(self.broker, self.port, 60)
+            # Optional LWT
+            try:
+                self.client.will_set(
+                    topic="service/status",
+                    payload=json.dumps({"status": "offline"}, ensure_ascii=False),
+                    qos=1,
+                    retain=True,
+                )
+            except Exception:
+                pass
+
+            keepalive = getattr(settings, "MQTT_KEEPALIVE", 60)
+            self.client.connect(self.broker, self.port, keepalive)
             self.client.loop_start()
             logger.info(f"Connected to MQTT broker: {self.broker}:{self.port}")
             return True
@@ -269,4 +379,3 @@ class MQTTService:
             
         except Exception as e:
             logger.error(f"WebSocket emission processing error: {e}")
-

@@ -134,19 +134,92 @@ class ArduinoMQTTBridge:
                 self.message_count += 1
                 logger.debug(f"Published message #{self.message_count}")
             
-            # Publish infractions to dedicated topic
+            # Publish infractions to dedicated topic (formato igual al simulador)
             if arduino_data.infractions:
+                logger.info(f"Detectadas {len(arduino_data.infractions)} infracciones en el Arduino")
                 for infraction in arduino_data.infractions:
+                    signal_id = infraction if isinstance(infraction, str) else infraction.get("signal_id", "unknown")
                     infraction_data = {
                         "timestamp": time.time(),
                         "alert_type": "INFRACCION",
                         "severity": 4,
-                        "signal_id": infraction if isinstance(infraction, str) else infraction.get("signal_id", "unknown"),
+                        "signal_id": signal_id,
                         "signal_color": "red",
-                        "origen": f"Infracción semáforo {infraction}"
+                        "origen": f"Infracción semáforo {signal_id}"
                     }
-                    self.mqtt_publisher.publish_infraction(infraction_data)
-                    logger.info(f"Published infraction: {infraction}")
+                    
+                    # Log visible de la infracción
+                    print("\n" + "!"*60)
+                    print(f"INFRACCION DETECTADA EN MQTT: Semaforo {signal_id}")
+                    print("!"*60 + "\n")
+                    
+                    if self.mqtt_publisher.publish_infraction(infraction_data):
+                        logger.info(f"Published infraction: {signal_id} to topic arduino/data/infracciones")
+                    else:
+                        logger.error(f"Failed to publish infraction: {signal_id}")
+            
+            # Publish seismic alerts (formato igual al simulador)
+            if arduino_data.seismic_event and arduino_data.seismic_event.active:
+                seismic_data = {
+                    "timestamp": time.time(),
+                    "alert_type": "SISMO",
+                    "severity": 4,
+                    "seismic_intensity": arduino_data.seismic_event.magnitude,
+                    "threshold_g": 2.0,
+                    "tiene_sismo": True,
+                    "origen": arduino_data.seismic_event.origin or "Sensor sísmico"
+                }
+                
+                # Log visible del sismo
+                print("\n" + "~"*60)
+                print(f"SISMO DETECTADO: Magnitud {arduino_data.seismic_event.magnitude}")
+                print(f"Origen: {seismic_data['origen']}")
+                print("~"*60 + "\n")
+                
+                if self.mqtt_publisher.publish(seismic_data, "arduino/data"):
+                    logger.info(f"Published seismic alert: magnitude={arduino_data.seismic_event.magnitude}")
+                else:
+                    logger.error("Failed to publish seismic alert")
+            
+            # Publish gas/smoke alerts (formato igual al simulador)
+            if arduino_data.gas_sensors:
+                for gas_sensor in arduino_data.gas_sensors:
+                    if gas_sensor.is_high:
+                        gas_alert_data = {
+                            "timestamp": time.time(),
+                            "alert_type": "GAS",
+                            "severity": 3,
+                            "gas_ppm": gas_sensor.ppm,
+                            "threshold_ppm": 275.0,
+                            "zona": gas_sensor.zone,
+                            "origen": gas_sensor.zone
+                        }
+                        
+                        # Log visible del gas/humo
+                        print("\n" + "#"*60)
+                        print(f"ALERTA DE GAS/HUMO: Zona {gas_sensor.zone}")
+                        print(f"PPM: {gas_sensor.ppm} (umbral: 275)")
+                        print("#"*60 + "\n")
+                        
+                        if self.mqtt_publisher.publish(gas_alert_data, "arduino/data"):
+                            logger.info(f"Published gas alert: zone={gas_sensor.zone}, ppm={gas_sensor.ppm}")
+                        else:
+                            logger.error(f"Failed to publish gas alert: {gas_sensor.zone}")
+            
+            # Publish panic button alerts to dedicated topic
+            if arduino_data.panic_buttons:
+                for panic_button in arduino_data.panic_buttons:
+                    if panic_button.active:
+                        panic_alert_data = {
+                            "timestamp": time.time(),
+                            "alert_type": "PANIC_BUTTON",
+                            "severity": 5,
+                            "button_id": panic_button.button_id,
+                            "location": panic_button.location,
+                            "origen": f"Botón de pánico {panic_button.id}"
+                        }
+                        self.mqtt_publisher.publish_panic_alert(panic_alert_data)
+                        logger.info(f"Published panic button alert: {panic_button.id} at {panic_button.location}")
         
         except Exception as e:
             logger.error(f"Error publishing data: {e}")
@@ -198,12 +271,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-

@@ -17,10 +17,11 @@ from app.schemas.weapon_schemas import (
     WeaponDetectionsResponse,
     WeaponCountsResponse,
     TopWeaponsResponse,
-    TopWeaponItem
+    TopWeaponItemx
 )
 from app.services.websocket_service import WebSocketService
-from app.api.dependencies import get_websocket_service
+from app.api.dependencies import get_websocket_service, get_serial_service
+from app.services.serial_service import APISerialService
 
 logger = get_logger(__name__)
 
@@ -37,7 +38,8 @@ def get_weapon_repository() -> WeaponRepository:
 async def create_weapon_detection(
     event: WeaponDetectionCreate,
     repository: WeaponRepository = Depends(get_weapon_repository),
-    websocket_service: WebSocketService = Depends(get_websocket_service)
+    websocket_service: WebSocketService = Depends(get_websocket_service),
+    serial_service: APISerialService = Depends(get_serial_service)
 ):
     """
     Create a new weapon detection event
@@ -84,6 +86,12 @@ async def create_weapon_detection(
         }
 
         await websocket_service.broadcast(websocket_data, "weapon")
+
+        # Send alert to Arduino over serial (type: ARMA)
+        serial_payload = f"ALERTA,ARMA,tipo={event.name},dist={event.distance:.2f},cam={event.camera_location}"
+        sent = serial_service.send_line(serial_payload)
+        if not sent:
+            logger.warning("Failed to send weapon alert over serial")
         logger.info(f"Weapon detection broadcasted via WebSocket: {event.name}")
 
         return event_response

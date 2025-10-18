@@ -28,3 +28,4 @@ echo "Ahora puedes ejecutar:"
 echo "  cd ia_modules"
 echo "  python run.py"
 echo "=========================================="
+

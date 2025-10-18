@@ -25,7 +25,9 @@ class FaceRecognitionModule(BaseModule):
         
         # Configuration
         self.gallery_dir = config.get("gallery_dir", "gallery")
-        self.api_url = config.get("api_url", "http://localhost:8001/api/v1/blacklist-events")
+        self.api_url_primary = config.get("api_url_primary", "http://localhost:8001/api/v1/blacklist-events")
+        self.api_url_secondary = config.get("api_url_secondary", "")
+        self.use_dual_apis = config.get("use_dual_apis", False)
         self.threshold = config.get("threshold", 0.50)
         self.detect_every = config.get("detect_every", 3)
         self.cooldown = config.get("cooldown", 8)
@@ -184,25 +186,38 @@ class FaceRecognitionModule(BaseModule):
             print(f"[{self.name}] Detection: {person_name} (dist={distance:.3f})")
     
     def _send_to_api(self, person_name: str, distance: float) -> bool:
-        """Send detection event to API"""
+        """Send detection event to API(s)"""
+        payload = {
+            "person_name": person_name,
+            "confidence": float(1.0 - distance),
+            "distance": float(distance),
+            "camera_location": self.camera_location
+        }
+        
+        success_primary = self._send_to_single_api(self.api_url_primary, payload, "Primary")
+        
+        # Send to secondary API if configured
+        success_secondary = True  # Default to True if no secondary API
+        if self.use_dual_apis and self.api_url_secondary:
+            success_secondary = self._send_to_single_api(self.api_url_secondary, payload, "Secondary")
+        
+        # Return True if at least primary API succeeds
+        return success_primary
+    
+    def _send_to_single_api(self, api_url: str, payload: Dict[str, Any], api_name: str) -> bool:
+        """Send payload to a single API endpoint"""
         try:
-            payload = {
-                "person_name": person_name,
-                "confidence": float(1.0 - distance),
-                "distance": float(distance),
-                "camera_location": self.camera_location
-            }
-            
-            response = requests.post(self.api_url, json=payload, timeout=2)
+            response = requests.post(api_url, json=payload, timeout=2)
             
             if response.status_code == 201:
+                print(f"[{self.name}] {api_name} API success: {payload['person_name']}")
                 return True
             else:
-                print(f"[{self.name}] API error: {response.status_code}")
+                print(f"[{self.name}] {api_name} API error: {response.status_code}")
                 return False
                 
         except Exception as e:
-            print(f"[{self.name}] API request failed: {e}")
+            print(f"[{self.name}] {api_name} API request failed: {e}")
             return False
     
     def draw(self, frame: np.ndarray, results: Dict[str, Any]) -> np.ndarray:
@@ -241,7 +256,9 @@ class FaceRecognitionModule(BaseModule):
             "template_names": list(self.templates.keys()),
             "threshold": self.threshold,
             "cooldown": self.cooldown,
-            "api_url": self.api_url
+            "api_url_primary": self.api_url_primary,
+            "api_url_secondary": self.api_url_secondary,
+            "use_dual_apis": self.use_dual_apis
         })
         return info
 

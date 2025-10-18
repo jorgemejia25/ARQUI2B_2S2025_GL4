@@ -16,9 +16,9 @@ class SerialService:
     """Service for serial communication with Arduino"""
     
     def __init__(self):
-        self.port = serial_settings.PORT
-        self.baudrate = serial_settings.BAUDRATE
-        self.timeout = serial_settings.TIMEOUT
+        self.port = serial_settings.SERIAL_PORT
+        self.baudrate = serial_settings.SERIAL_BAUDRATE
+        self.timeout = serial_settings.SERIAL_TIMEOUT
         self.connection: Optional[serial.Serial] = None
         self.is_connected = False
     
@@ -67,9 +67,12 @@ class SerialService:
             return None
         
         try:
-            if self.connection.in_waiting > 0:
-                line = self.connection.readline()
-                return line.decode('utf-8', errors='ignore').strip()
+            # readline() bloqueará hasta encontrar \n o timeout
+            line = self.connection.readline()
+            if line:
+                decoded = line.decode('utf-8', errors='ignore').strip()
+                if decoded:  # Solo retornar si hay contenido
+                    return decoded
             return None
         except serial.SerialException as e:
             logger.error(f"Serial read error: {e}")
@@ -115,18 +118,53 @@ class SerialService:
             JSON string or None if timeout/error
         """
         start_time = time.time()
-        buffer = ""
+        buffer = []  # accumulate chunks to avoid repeated string copies
+        brace_depth = 0
+        in_json = False
         
         while (time.time() - start_time) < timeout:
             line = self.read_line()
-            if line:
-                buffer += line
-                # Check if we have a complete JSON
-                if buffer.strip().startswith('{') and buffer.strip().endswith('}'):
-                    return buffer.strip()
-            time.sleep(0.01)
+            if not line:
+                # read_line ya bloqueó con su timeout, no necesitamos sleep extra
+                continue
+            
+            stripped = line.strip()
+            if not stripped:
+                continue
+            
+            # Try to detect start of JSON
+            # Many Arduinos send extra logs; ignore until '{' appears
+            for ch in stripped:
+                if ch == '{':
+                    in_json = True
+                    brace_depth += 1
+                    buffer.append('{')
+                elif ch == '}' and in_json:
+                    brace_depth -= 1
+                    buffer.append('}')
+                    if brace_depth == 0:
+                        json_str = ''.join(buffer).strip()
+                        if json_str:
+                            return json_str
+                        buffer = []
+                        in_json = False
+                elif in_json:
+                    buffer.append(ch)
+                else:
+                    # ignore noise before JSON starts
+                    continue
+            
+            # Safety: prevent unbounded growth if malformed stream
+            if len(buffer) > 5 * 1024:
+                logger.warning("Serial buffer exceeded 5KB without closing JSON; resetting buffer")
+                buffer = []
+                brace_depth = 0
+                in_json = False
         
-        return None if not buffer else buffer.strip()
+        # Timeout fallback: return best-effort if it looks like JSON
+        if buffer and in_json and brace_depth == 0:
+            return ''.join(buffer).strip()
+        return None
     
     def __enter__(self):
         """Context manager entry"""

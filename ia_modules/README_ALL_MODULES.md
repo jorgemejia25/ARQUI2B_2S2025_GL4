@@ -109,3 +109,4 @@ Los logs incluyen:
 - Detecciones en tiempo real
 - Errores y advertencias
 - Estadísticas de rendimiento
+

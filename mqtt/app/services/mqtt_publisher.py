@@ -39,6 +39,15 @@ class MQTTPublisher:
         """
         try:
             self.client = mqtt.Client(client_id=self.client_id)
+            # Integrate client logs with application logger and set reconnection backoff
+            try:
+                self.client.enable_logger(logger)
+            except Exception:
+                pass
+            try:
+                self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+            except Exception:
+                pass
             
             # Set callbacks
             self.client.on_connect = self._on_connect
@@ -50,8 +59,20 @@ class MQTTPublisher:
                 self.client.username_pw_set(self.username, self.password)
                 logger.info(f"MQTT authentication configured: {self.username}")
             
-            # Connect to broker
-            self.client.connect(self.broker, self.port, 60)
+            # Optional: Last Will to detect unexpected disconnects
+            try:
+                self.client.will_set(
+                    topic=f"{self.topic}/status",
+                    payload=json.dumps({"status": "offline", "client_id": self.client_id}, ensure_ascii=False),
+                    qos=self.qos,
+                    retain=True,
+                )
+            except Exception:
+                pass
+
+            # Connect to broker using configured keepalive
+            keepalive = getattr(mqtt_settings, "KEEPALIVE", 60)
+            self.client.connect(self.broker, self.port, keepalive)
             self.client.loop_start()
             
             logger.info(f"Connecting to MQTT broker: {self.broker}:{self.port}")
@@ -119,6 +140,20 @@ class MQTTPublisher:
             True if successful, False otherwise
         """
         return self.publish(infraction_data, self.topic_infractions)
+    
+    def publish_panic_alert(self, panic_data: Dict[str, Any]) -> bool:
+        """
+        Publish panic button alert to MQTT broker
+        
+        Args:
+            panic_data: Panic button data dictionary
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        topic_panic = "arduino/data/panic"
+        logger.info(f"Publicando alerta de pánico a topic: {topic_panic}")
+        return self.publish(panic_data, topic_panic)
     
     def _on_connect(self, client, userdata, flags, rc):
         """Callback when connected to broker"""

@@ -26,14 +26,19 @@ class Settings(BaseSettings):
     DATABASE_PATH: str = "./seguridad_trafico.db"
     
     # MQTT Configuration
-    MQTT_BROKER: str = "localhost"
+    MQTT_BROKER: str = "test.mosquitto.org"
     MQTT_PORT: int = 1883
-    MQTT_USERNAME: str = "jorge"
-    MQTT_PASSWORD: str = "34eikykmbd8w5igpjiebialeisx0yu02"
+    MQTT_USERNAME: str = ""
+    MQTT_PASSWORD: str = ""
     MQTT_TOPICS: List[str] = [
         "arduino/data",
         "arduino/data/infracciones"
     ]
+    
+    # Serial (Arduino) Configuration
+    SERIAL_PORT: str = "/dev/ttyACM0"
+    SERIAL_BAUDRATE: int = 115200
+    SERIAL_TIMEOUT: float = 5.0
     
     # Logging Configuration
     LOG_LEVEL: str = "INFO"

@@ -212,7 +212,7 @@ class _ConfigPanelState extends State<ConfigPanel> {
                       controller: _baseUrlController,
                       decoration: const InputDecoration(
                         labelText: 'URL Base (HTTP/HTTPS)',
-                        hintText: 'http://192.168.1.158:8001',
+                        hintText: 'http://69.164.244.224:8001',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -221,7 +221,7 @@ class _ConfigPanelState extends State<ConfigPanel> {
                       controller: _wsUrlController,
                       decoration: const InputDecoration(
                         labelText: 'URL WebSocket (WS/WSS)',
-                        hintText: 'ws://192.168.1.158:8001',
+                        hintText: 'ws://69.164.244.224:8001',
                         border: OutlineInputBorder(),
                       ),
                     ),

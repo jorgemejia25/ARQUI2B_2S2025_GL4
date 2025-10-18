@@ -179,46 +179,45 @@ class AISystem:
     
     def _setup_face_recognition(self) -> bool:
         """Setup face recognition module"""
-        config = {
-            "gallery_dir": "gallery",
-            "api_url": "http://localhost:8001/api/v1/blacklist-events",
-            "threshold": self.args.threshold,
-            "detect_every": max(5, self.args.detect_every),  # Process every 5 frames for better performance
-            "cooldown": self.args.cooldown,
-            "camera_location": "Main Camera"
-        }
+        from config import Config
+        config = Config.get_face_recognition_config(
+            threshold=self.args.threshold,
+            detect_every=max(5, self.args.detect_every),  # Process every 5 frames for better performance
+            cooldown=self.args.cooldown,
+            camera_location="Main Camera"
+        )
         
         face_module = FaceRecognitionModule(config)
         return self.manager.add_module(face_module)
 
     def _setup_weapon_detection(self) -> bool:
         """Setup weapon detection (YOLOv8) module"""
+        from config import Config
         # Try to use trained weights if present; otherwise fallback happens inside module
-        config = {
-            "weights_path": "models/weapons/best.pt",  # preferred relative location
-            "api_url": "http://localhost:8001/api/v1/weapon-detections",
-            "cooldown": 5,  # seconds
-            "camera_location": "Main Camera",
-            "conf": self.args.yolo_conf,
-            "imgsz": min(416, self.args.yolo_imgsz),  # Limit image size for better performance
-            "detect_every": max(3, self.args.yolo_detect_every),  # Process every 3 frames
-            "gap": self.args.yolo_gap,
-            "update_interval": self.args.yolo_update_interval,
-            "real_width_cm": self.args.yolo_real_width_cm,
-            "assume_first_dist_cm": self.args.yolo_assume_first_dist_cm,
-        }
+        config = Config.get_weapon_detection_config(
+            weights_path="models/weapons/best.pt",  # preferred relative location
+            cooldown=5,  # seconds
+            camera_location="Main Camera",
+            conf=self.args.yolo_conf,
+            imgsz=min(416, self.args.yolo_imgsz),  # Limit image size for better performance
+            detect_every=max(3, self.args.yolo_detect_every),  # Process every 3 frames
+            gap=self.args.yolo_gap,
+            update_interval=self.args.yolo_update_interval,
+            real_width_cm=self.args.yolo_real_width_cm,
+            assume_first_dist_cm=self.args.yolo_assume_first_dist_cm,
+        )
         weapon_module = WeaponDetectionModule(config)
         return self.manager.add_module(weapon_module)
     
     def _setup_plate_detection(self) -> bool:
         """Setup plate detection module"""
-        config = {
-            "api_url": "http://localhost:8001/api/v1/plate-events",
-            "confidence_threshold": 0.45,
-            "camera_location": "Entrada Principal",
-            "events_dir": "events",
-            "cooldown": 6
-        }
+        from config import Config
+        config = Config.get_plate_detection_config(
+            confidence_threshold=0.45,
+            camera_location="Entrada Principal",
+            events_dir="events",
+            cooldown=6
+        )
 
         plate_module = PlateDetectionModule(config)
         return self.manager.add_module(plate_module)

@@ -64,11 +64,36 @@ bool stopETAArmed[N_SENSORS] = {0};
 // =====================================================
 const uint8_t BUZ_TU1_PIN = 36; // BUZ1
 const uint8_t BUZ_TU2_PIN = 37; // BUZ2
-const uint8_t BUZ3_PIN = 2;     // BUZ3
+const uint8_t BUZ3_PIN = 2;     // BUZ3 (también sirena)
 const uint8_t BUZ4_PIN = 3;     // BUZ4
 const uint16_t BUZZ_MS = 500;
 
 uint32_t buz1Until = 0, buz2Until = 0, buz3Until = 0, buz4Until = 0;
+
+// Variables para sirenas de alerta
+bool sirenaActiva = false;
+uint32_t sirenaHasta = 0;
+
+// Variables para incendios
+bool incendioActivo = false;
+uint32_t incendioHasta = 0;
+uint32_t incendioLastChange = 0;
+bool incendioTonoAlto = true;
+const uint32_t INCENDIO_CHANGE_MS = 200; // Cambio cada 200ms
+const int INCENDIO_FREQ_LOW = 800;   // Frecuencia baja
+const int INCENDIO_FREQ_HIGH = 1200; // Frecuencia alta
+
+// *** SOLO ARMA ***
+int armaFreqs[3] = {200, 500, 800};
+const uint32_t ARMA_CHANGE_MS = 300;
+
+int sirenFreqIndex = 0;
+int *currentFreqs;
+uint32_t currentChangeMs;
+uint32_t sirenLastChange = 0;
+
+enum AlertaTipo { NINGUNA, ARMA };
+AlertaTipo alertaActual = NINGUNA;
 
 bool panicButtonsActiveState[4] = {false, false, false, false};
 uint32_t panicButtonsUntil[4] = {0, 0, 0, 0};
@@ -80,20 +105,24 @@ inline void buzzPin(uint8_t pin)
   {
     digitalWrite(BUZ_TU1_PIN, HIGH);
     buz1Until = now + 2000;
-    digitalWrite(Modificar_BUZ1TESTCALI, HIGH);
+    Serial.print("MENSAJECALIFICACION,");
   }
   else if (pin == BUZ_TU2_PIN)
   {
     digitalWrite(BUZ_TU2_PIN, HIGH);
     buz2Until = now + 2000;
-    digitalWrite(Modificar_BUZ2TESTCALI, HIGH);
   }
   else if (pin == BUZ3_PIN)
   {
-    buz3Until = now + 2000;
+    if (!sirenaActiva) // Solo activar si no hay sirena activa
+    {
+      digitalWrite(BUZ3_PIN, HIGH);
+      buz3Until = now + 2000;
+    }
   }
   else if (pin == BUZ4_PIN)
   {
+    digitalWrite(BUZ4_PIN, HIGH);
     buz4Until = now + 2000;
   }
 }
@@ -103,14 +132,63 @@ void updateBuzzers()
   if (buz1Until && now >= buz1Until)
   {
     digitalWrite(BUZ_TU1_PIN, LOW);
-    digitalWrite(Modificar_BUZ1TESTCALI, LOW);
     buz1Until = 0;
   }
   if (buz2Until && now >= buz2Until)
   {
     digitalWrite(BUZ_TU2_PIN, LOW);
-    digitalWrite(Modificar_BUZ2TESTCALI, LOW);
     buz2Until = 0;
+  }
+  if (buz3Until && now >= buz3Until)
+  {
+    if (!sirenaActiva) // Solo apagar si no hay sirena activa
+      digitalWrite(BUZ3_PIN, LOW);
+    buz3Until = 0;
+  }
+  if (buz4Until && now >= buz4Until)
+  {
+    digitalWrite(BUZ4_PIN, LOW);
+    buz4Until = 0;
+  }
+}
+
+void updateSirena()
+{
+  if (sirenaActiva)
+  {
+    uint32_t now = millis();
+    if (now - sirenLastChange >= currentChangeMs)
+    {
+      sirenFreqIndex = (sirenFreqIndex + 1) % 3;
+      tone(BUZ3_PIN, currentFreqs[sirenFreqIndex]); // Usar pin 2 para sirena
+      sirenLastChange = now;
+    }
+    if (now >= sirenaHasta)
+    {
+      noTone(BUZ3_PIN); // Apagar el tono
+      sirenaActiva = false;
+      alertaActual = NINGUNA;
+    }
+  }
+}
+
+void updateIncendio()
+{
+  if (incendioActivo)
+  {
+    uint32_t now = millis();
+    if (now - incendioLastChange >= INCENDIO_CHANGE_MS)
+    {
+      int freq = incendioTonoAlto ? INCENDIO_FREQ_HIGH : INCENDIO_FREQ_LOW;
+      tone(BUZ3_PIN, freq); // Usar pin 2 para sonido de incendio
+      incendioTonoAlto = !incendioTonoAlto; // Alternar tono
+      incendioLastChange = now;
+    }
+    if (now >= incendioHasta)
+    {
+      noTone(BUZ3_PIN); // Apagar el tono
+      incendioActivo = false;
+    }
   }
 }
 
@@ -354,8 +432,6 @@ inline bool isGroupRed(uint8_t g)
 uint8_t sdConsec[5] = {0, 0, 0, 0, 0};
 bool sdAlerted[5] = {false, false, false, false, false};
 
-
-// Cambia solamente flutter para que los semaforos del svg solo sean SD y SI en el SVG. Que se enciendan por grupos solamente. Esto en el mapa. Para no complicarnos y que se enciendan agrupados
 // Mapeo por dirección
 const uint8_t SD_TO_S_DIR21[5] = {1, 3, 5, 7, 9};  // TU 2→1
 const uint8_t SD_TO_S_DIR12[5] = {10, 3, 4, 7, 9}; // TU 1→2
@@ -819,9 +895,34 @@ void loop()
   // ====== Sismo: liberar salidas cuando termine ======
   EQ_releaseOutputsIfEnded();
 
+  // Leer comandos serial para alertas (SOLO ARMA)
+  if (Serial.available())
+  {
+    String comando = Serial.readStringUntil('\n');
+    comando.trim();
+    Serial.println("Comando recibido: '" + comando + "'");  // Debug
+    if (comando == "ALERTA_ARMA")
+    {
+      alertaActual = ARMA;
+      Serial.println("Activando sirena ARMA");  // Debug
+    }
+    if (alertaActual != NINGUNA)
+    {
+      sirenaActiva = true;
+      sirenaHasta = millis() + 5000; // 5 segundos
+      currentFreqs = armaFreqs;
+      currentChangeMs = ARMA_CHANGE_MS;
+      sirenFreqIndex = 0;
+      tone(BUZ3_PIN, currentFreqs[0]); // Usar pin 2 para sirena
+      sirenLastChange = millis();
+    }
+  }
+
   // Botones y timers de zumbadores 1/2
   readButtonsAndTrigger();
   updateBuzzers();
+  updateSirena();
+  updateIncendio();
 
   // Desactivar botones de pánico después de 2 segundos
   uint32_t now = millis();
@@ -848,8 +949,24 @@ void loop()
   {
     // Al terminar el sismo, esta rutina apaga los 4 una vez (usa eq_forced)
     EQ_releaseOutputsIfEnded();
-    // Comportamiento normal de BUZ3/BUZ4 (incendios/timer)
-    digitalWrite(BUZ3_PIN, (incendio1 || (millis() < buz3Until)) ? HIGH : LOW);
+    
+    // Comportamiento de incendios con sonido especial
+    if (incendio1 && !sirenaActiva && !incendioActivo)
+    {
+      // Activar sonido de incendio en pin 2
+      incendioActivo = true;
+      incendioHasta = millis() + 3000; // 3 segundos de alarma
+      incendioLastChange = millis();
+      incendioTonoAlto = true;
+      tone(BUZ3_PIN, INCENDIO_FREQ_HIGH);
+    }
+    else if (!incendio1 && !sirenaActiva && !incendioActivo)
+    {
+      // Comportamiento normal para pin 2 si no hay incendio ni sirena
+      digitalWrite(BUZ3_PIN, (millis() < buz3Until) ? HIGH : LOW);
+    }
+    
+    // Pin 4 maneja incendio2 con sonido normal (sin tone)
     digitalWrite(BUZ4_PIN, (incendio2 || (millis() < buz4Until)) ? HIGH : LOW);
   }
 

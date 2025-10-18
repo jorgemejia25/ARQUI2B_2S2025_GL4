@@ -2,7 +2,7 @@
 /// Sistema de Seguridad de Tráfico - Arquitectura de Software 2
 class ApiConfig {
   // URLs de desarrollo local
-  static const String _localBaseUrl = 'http://172.20.10.8:8001';
+  static const String _localBaseUrl = 'http://69.164.244.224:8001';
 
   //DANT: local HOST ME FUNCIONA probar si no te funciona
 

@@ -23,7 +23,9 @@ class PlateDetectionModule(BaseModule):
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__("plate_detection")
-        self.api_url = config.get("api_url", "http://localhost:8001/api/v1/plate-events")
+        self.api_url_primary = config.get("api_url_primary", "http://localhost:8001/api/v1/plate-events")
+        self.api_url_secondary = config.get("api_url_secondary", "")
+        self.use_dual_apis = config.get("use_dual_apis", False)
         self.conf_threshold = config.get("conf_threshold", 0.45)
         self.cooldown = config.get("cooldown", 5)
         self.camera_location = config.get("camera_location", "Entrada Principal")
@@ -134,14 +136,33 @@ class PlateDetectionModule(BaseModule):
                 "image_base64": encoded_image
             }
 
-            response = requests.post(self.api_url, json=payload, timeout=5)
-            if response.status_code == 201:
+            # Send to primary API
+            success_primary = self._send_to_single_api(self.api_url_primary, payload, "Primary")
+            
+            # Send to secondary API if configured
+            success_secondary = True  # Default to True if no secondary API
+            if self.use_dual_apis and self.api_url_secondary:
+                success_secondary = self._send_to_single_api(self.api_url_secondary, payload, "Secondary")
+            
+            if success_primary:
                 print(f"[{self.name}] Evento enviado correctamente a la API ({plate_text}).")
-            else:
-                print(f"[{self.name}] API error {response.status_code}: {response.text}")
 
         except Exception as e:
             print(f"[{self.name}] Error sending to API: {e}")
+    
+    def _send_to_single_api(self, api_url: str, payload: Dict[str, Any], api_name: str) -> bool:
+        """Send payload to a single API endpoint"""
+        try:
+            response = requests.post(api_url, json=payload, timeout=5)
+            if response.status_code == 201:
+                print(f"[{self.name}] {api_name} API success: {payload['plate_text']}")
+                return True
+            else:
+                print(f"[{self.name}] {api_name} API error {response.status_code}: {response.text}")
+                return False
+        except Exception as e:
+            print(f"[{self.name}] {api_name} API request failed: {e}")
+            return False
 
     def draw(self, frame: np.ndarray, results: Dict[str, Any]) -> np.ndarray:
         """Draw bounding boxes around detected text"""
@@ -163,7 +184,9 @@ class PlateDetectionModule(BaseModule):
     def get_info(self) -> Dict[str, Any]:
         info = super().get_info()
         info.update({
-            "api_url": self.api_url,
+            "api_url_primary": self.api_url_primary,
+            "api_url_secondary": self.api_url_secondary,
+            "use_dual_apis": self.use_dual_apis,
             "conf_threshold": self.conf_threshold,
             "cooldown": self.cooldown,
             "camera_location": self.camera_location,

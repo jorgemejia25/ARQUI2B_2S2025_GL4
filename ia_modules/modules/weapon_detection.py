@@ -32,7 +32,9 @@ class WeaponDetectionModule(BaseModule):
         self.real_width_cm = config.get("real_width_cm", None)
         self.assume_first_dist_cm = config.get("assume_first_dist_cm", None)
         # API configuration
-        self.api_url = config.get("api_url", "http://localhost:8001/api/v1/weapon-detections")
+        self.api_url_primary = config.get("api_url_primary", "http://localhost:8001/api/v1/weapon-detections")
+        self.api_url_secondary = config.get("api_url_secondary", "")
+        self.use_dual_apis = config.get("use_dual_apis", False)
         self.cooldown = config.get("cooldown", 5)  # seconds between detections for same weapon
         self.camera_location = config.get("camera_location", "Main Camera")
         # Global focal and calibration like top_events
@@ -307,25 +309,39 @@ class WeaponDetectionModule(BaseModule):
         # print("\n".join(out_lines))
 
     def _send_to_api(self, weapon_name: str, distance: float) -> bool:
-        """Send weapon detection event to API"""
+        """Send weapon detection event to API(s)"""
+        import requests  # lazy import
+        payload = {
+            "name": weapon_name,
+            "distance": float(distance),
+            "camera_location": self.camera_location
+        }
+        
+        success_primary = self._send_to_single_api(self.api_url_primary, payload, "Primary")
+        
+        # Send to secondary API if configured
+        success_secondary = True  # Default to True if no secondary API
+        if self.use_dual_apis and self.api_url_secondary:
+            success_secondary = self._send_to_single_api(self.api_url_secondary, payload, "Secondary")
+        
+        # Return True if at least primary API succeeds
+        return success_primary
+    
+    def _send_to_single_api(self, api_url: str, payload: Dict[str, Any], api_name: str) -> bool:
+        """Send payload to a single API endpoint"""
         try:
             import requests  # lazy import
-            payload = {
-                "name": weapon_name,
-                "distance": float(distance),
-                "camera_location": self.camera_location
-            }
-
-            response = requests.post(self.api_url, json=payload, timeout=2)
+            response = requests.post(api_url, json=payload, timeout=2)
 
             if response.status_code == 201:
+                print(f"[weapon_detection] {api_name} API success: {payload['name']}")
                 return True
             else:
-                print(f"[weapon_detection] API error: {response.status_code}")
+                print(f"[weapon_detection] {api_name} API error: {response.status_code}")
                 return False
 
         except Exception as e:
-            print(f"[weapon_detection] API request failed: {e}")
+            print(f"[weapon_detection] {api_name} API request failed: {e}")
             return False
 
     def draw(self, frame: np.ndarray, results: Dict[str, Any]) -> np.ndarray:

@@ -9,10 +9,12 @@ from app.db.repositories.alert_repository import AlertRepository
 from app.db.repositories.dashboard_repository import DashboardRepository
 from app.services.mqtt_service import MQTTService
 from app.services.websocket_service import WebSocketService
+from app.services.serial_service import APISerialService
 
 # Global service instances
 _mqtt_service = None
 _websocket_service = None
+_serial_service = None
 
 
 def get_mqtt_service() -> MQTTService:
@@ -29,6 +31,14 @@ def get_websocket_service() -> WebSocketService:
     if _websocket_service is None:
         _websocket_service = WebSocketService()
     return _websocket_service
+
+
+def get_serial_service() -> APISerialService:
+    """Get Serial service instance"""
+    global _serial_service
+    if _serial_service is None:
+        _serial_service = APISerialService()
+    return _serial_service
 
 
 def get_db_connection() -> Generator[DatabaseConnection, None, None]:

@@ -17,7 +17,7 @@ from app.schemas.weapon_schemas import (
     WeaponDetectionsResponse,
     WeaponCountsResponse,
     TopWeaponsResponse,
-    TopWeaponItemx
+    TopWeaponItem
 )
 from app.services.websocket_service import WebSocketService
 from app.api.dependencies import get_websocket_service, get_serial_service

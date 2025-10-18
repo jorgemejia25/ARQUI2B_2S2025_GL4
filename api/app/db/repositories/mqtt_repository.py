@@ -35,6 +35,8 @@ class MQTTRepository(BaseRepository):
                 return self._save_infraction_data(payload)
             elif topic == "arduino/data/sensors":
                 return self._save_active_sensor_data(payload)
+            elif topic == "arduino/data/panic":
+                return self._save_panic_alert(payload)
             else:
                 logger.warning(f"Unrecognized MQTT topic: {topic}")
                 return False
@@ -45,6 +47,17 @@ class MQTTRepository(BaseRepository):
     def _save_arduino_data(self, payload: Dict[str, Any]) -> bool:
         """Save general Arduino data"""
         saved_something = False
+        
+        # Detectar alertas específicas en el topic principal
+        alert_type = payload.get("alert_type", "")
+        
+        if alert_type == "SISMO":
+            # Guardar alerta de sismo
+            return self._save_seismic_alert(payload)
+        
+        elif alert_type == "GAS":
+            # Guardar alerta de gas/humo
+            return self._save_gas_alert(payload)
         
         # Save gas measurements
         if "gas" in payload and isinstance(payload["gas"], list):
@@ -96,13 +109,16 @@ class MQTTRepository(BaseRepository):
         """Save traffic infraction from dedicated topic"""
         signal_id = payload.get("signal_id", "unknown")
         severity = payload.get("severity", 4)
+        origen = payload.get("origen", f"Infracción {signal_id}")
+        
+        logger.info(f"Guardando infracción: {signal_id} - {origen}")
         
         # Get INFRACCION alert type
         type_query = "SELECT alert_type_id FROM AlertType WHERE code = 'INFRACCION'"
         type_result = self.execute_query(type_query)
         
         if not type_result:
-            logger.error("INFRACCION alert type not found")
+            logger.error("INFRACCION alert type not found in database")
             return False
         
         alert_type_id = type_result[0]["alert_type_id"]
@@ -115,10 +131,126 @@ class MQTTRepository(BaseRepository):
         result = self.execute_query(alert_query, (alert_type_id, severity))
         
         if result is None:
-            logger.info(f"Infraction saved: {signal_id}, severity={severity}")
+            logger.info(f"Infracción guardada exitosamente: {signal_id} (severity={severity})")
+            print(f"[DB] Infracción guardada: {signal_id}")
             return True
         else:
-            logger.error("Failed to save infraction")
+            logger.error(f"Error al guardar infracción: {signal_id}")
+            return False
+    
+    def _save_panic_alert(self, payload: Dict[str, Any]) -> bool:
+        """Save panic button alert from dedicated topic"""
+        button_id = payload.get("button_id", "unknown")
+        location = payload.get("location", "unknown")
+        severity = payload.get("severity", 5)
+        
+        logger.info(f"Guardando alerta de pánico: {button_id} en {location}")
+        
+        # Get PANIC_BUTTON alert type (intentar varios códigos posibles)
+        type_query = """
+        SELECT alert_type_id FROM AlertType 
+        WHERE code IN ('PANIC_BUTTON', 'BOTON_PANICO', 'PANICO')
+        LIMIT 1
+        """
+        type_result = self.execute_query(type_query)
+        
+        if not type_result:
+            logger.error("PANIC_BUTTON alert type not found in database")
+            # Intentar con INCENDIO como fallback
+            fallback_query = "SELECT alert_type_id FROM AlertType WHERE code = 'INCENDIO'"
+            type_result = self.execute_query(fallback_query)
+            if not type_result:
+                logger.error("No suitable alert type found for panic button")
+                return False
+        
+        alert_type_id = type_result[0]["alert_type_id"]
+        
+        # Insert alert
+        alert_query = """
+        INSERT INTO Alert (ts, alert_type_id, severity, bus_id, stop_id)
+        VALUES (datetime('now'), ?, ?, NULL, NULL)
+        """
+        result = self.execute_query(alert_query, (alert_type_id, severity))
+        
+        if result is None:
+            logger.info(f"Panic button alert saved: {button_id} at {location}, severity={severity}")
+            return True
+        else:
+            logger.error("Failed to save panic button alert")
+            return False
+    
+    def _save_seismic_alert(self, payload: Dict[str, Any]) -> bool:
+        """Save seismic alert"""
+        magnitude = payload.get("seismic_intensity", 0.0)
+        origen = payload.get("origen", "Sensor sísmico")
+        severity = payload.get("severity", 4)
+        
+        logger.info(f"Guardando alerta de sismo: magnitud={magnitude}, origen={origen}")
+        
+        # Get SISMO alert type
+        type_query = """
+        SELECT alert_type_id FROM AlertType 
+        WHERE code IN ('SISMO', 'SEISMIC', 'TERREMOTO')
+        LIMIT 1
+        """
+        type_result = self.execute_query(type_query)
+        
+        if not type_result:
+            logger.error("SISMO alert type not found in database")
+            return False
+        
+        alert_type_id = type_result[0]["alert_type_id"]
+        
+        # Insert alert
+        alert_query = """
+        INSERT INTO Alert (ts, alert_type_id, severity, bus_id, stop_id)
+        VALUES (datetime('now'), ?, ?, NULL, NULL)
+        """
+        result = self.execute_query(alert_query, (alert_type_id, severity))
+        
+        if result is None:
+            logger.info(f"Alerta de sismo guardada: magnitud={magnitude}")
+            print(f"[DB] Alerta de sismo guardada: magnitud={magnitude}")
+            return True
+        else:
+            logger.error("Failed to save seismic alert")
+            return False
+    
+    def _save_gas_alert(self, payload: Dict[str, Any]) -> bool:
+        """Save gas/smoke alert"""
+        zone = payload.get("zona", "unknown")
+        gas_ppm = payload.get("gas_ppm", 0)
+        severity = payload.get("severity", 3)
+        
+        logger.info(f"Guardando alerta de gas: zona={zone}, ppm={gas_ppm}")
+        
+        # Get INCENDIO/GAS alert type
+        type_query = """
+        SELECT alert_type_id FROM AlertType 
+        WHERE code IN ('INCENDIO', 'GAS', 'HUMO', 'FIRE')
+        LIMIT 1
+        """
+        type_result = self.execute_query(type_query)
+        
+        if not type_result:
+            logger.error("GAS/INCENDIO alert type not found in database")
+            return False
+        
+        alert_type_id = type_result[0]["alert_type_id"]
+        
+        # Insert alert
+        alert_query = """
+        INSERT INTO Alert (ts, alert_type_id, severity, bus_id, stop_id)
+        VALUES (datetime('now'), ?, ?, NULL, NULL)
+        """
+        result = self.execute_query(alert_query, (alert_type_id, severity))
+        
+        if result is None:
+            logger.info(f"Alerta de gas guardada: zona={zone}, ppm={gas_ppm}")
+            print(f"[DB] Alerta de gas guardada: zona={zone}, PPM={gas_ppm}")
+            return True
+        else:
+            logger.error("Failed to save gas alert")
             return False
     
     def _save_traffic_infraction(self, infraccion: Any) -> bool:

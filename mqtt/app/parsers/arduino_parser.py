@@ -31,7 +31,11 @@ class ArduinoDataParser:
             data = json.loads(json_str)
             return ArduinoDataParser.parse_dict(data)
         except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
+            # Log a short, sanitized preview to help diagnose malformed inputs
+            preview = (json_str or "").replace("\n", " ").replace("\r", " ")
+            if len(preview) > 256:
+                preview = preview[:256] + "..."
+            logger.error(f"JSON decode error: {e}; payload_len={len(json_str) if json_str is not None else 0}; preview='{preview}'")
             return None
         except Exception as e:
             logger.error(f"Parse error: {e}")
@@ -60,25 +64,62 @@ class ArduinoDataParser:
         
         # Parse gas sensors
         gas_sensors = []
+        
+        # Intentar formato de lista (simulador): [{"zona": "Z1", "ppm": 200, ...}, ...]
         gas_data = data.get("gas", [])
         if isinstance(gas_data, list):
             for gas in gas_data:
                 if isinstance(gas, dict):
+                    ppm_value = gas.get("ppm", 0)
+                    is_high = gas.get("is_alto", False) or ppm_value > 275
                     gas_sensors.append(GasSensor(
                         zone=gas.get("zona", "unknown"),
-                        ppm=gas.get("ppm", 0),
-                        is_high=gas.get("is_alto", False) or gas.get("ppm", 0) > 275
+                        ppm=ppm_value,
+                        is_high=is_high
+                    ))
+        
+        # Intentar formato de objeto (Arduino real): {"gas_ppm": {"Z1": 200, "Z2": 200}}
+        gas_ppm_data = data.get("gas_ppm", {})
+        if isinstance(gas_ppm_data, dict):
+            for zone, ppm_value in gas_ppm_data.items():
+                if isinstance(ppm_value, (int, float)):
+                    is_high = ppm_value > 275
+                    if is_high:
+                        logger.info(f"Gas alto detectado en {zone}: {ppm_value} PPM")
+                    gas_sensors.append(GasSensor(
+                        zone=zone,
+                        ppm=int(ppm_value),
+                        is_high=is_high
                     ))
         
         # Parse panic buttons
         panic_buttons = []
-        panic_data = data.get("botones_panico_activos", [])
-        if isinstance(panic_data, list):
+        # Intentar ambos formatos: objeto (Arduino real) y lista (simulador)
+        panic_data = data.get("panic_buttons", data.get("botones_panico_activos", []))
+        
+        if isinstance(panic_data, dict):
+            # Formato del Arduino real: {"PB1": {"activo": 1, "ts": "...", "id": "PB1"}, ...}
+            for button_key, button_info in panic_data.items():
+                if isinstance(button_info, dict):
+                    is_active = button_info.get("activo", 0) == 1 or button_info.get("activo", False)
+                    if is_active:
+                        logger.info(f"Botón de pánico detectado: {button_key} - activo={is_active}")
+                    panic_buttons.append(PanicButton(
+                        id=button_info.get("id", button_key),
+                        active=is_active,
+                        button_id=str(button_info.get("id", button_key)),
+                        location=button_info.get("ubicacion", f"Zona {button_key}")
+                    ))
+        elif isinstance(panic_data, list):
+            # Formato del simulador: [{"id": "PB1", "activo": true, ...}, ...]
             for button in panic_data:
                 if isinstance(button, dict):
+                    is_active = button.get("activo", False)
+                    if is_active:
+                        logger.info(f"Botón de pánico detectado (lista): {button.get('id')} - activo={is_active}")
                     panic_buttons.append(PanicButton(
                         id=button.get("id", "unknown"),
-                        active=button.get("activo", False),
+                        active=is_active,
                         button_id=str(button.get("button_id", "")),
                         location=button.get("ubicacion", "")
                     ))
@@ -101,6 +142,10 @@ class ArduinoDataParser:
         infractions = data.get("infracciones", [])
         if not isinstance(infractions, list):
             infractions = []
+        
+        # Log infracciones detectadas
+        if infractions:
+            logger.info(f"Infracciones parseadas del Arduino: {infractions}")
         
         # Parse seismic data
         has_earthquake = data.get("tiene_sismo", False)

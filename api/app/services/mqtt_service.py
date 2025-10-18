@@ -13,13 +13,13 @@ from app.core.logging import get_logger
 from app.db.connection import DatabaseConnection
 from app.db.repositories.mqtt_repository import MQTTRepository
 
-logger = get_logger(_name_)
+logger = get_logger(__name__)
 
 
 class MQTTService:
     """Service for MQTT operations"""
     
-    def _init_(self, websocket_manager=None):
+    def __init__(self, websocket_manager=None):
         self.broker = settings.MQTT_BROKER
         self.port = settings.MQTT_PORT
         self.topics = settings.MQTT_TOPICS
@@ -297,8 +297,25 @@ class MQTTService:
     async def _process_websocket_emission(self, topic: str, payload: Dict[str, Any]):
         """Process and emit data via WebSocket"""
         try:
+            # Process infractions from dedicated topic
+            if topic == "arduino/data/infracciones":
+                # Emit infraction alert with proper Flutter format
+                alert_data = {
+                    "type": "infraction",
+                    "timestamp": time.time(),
+                    "data": {
+                        "alert_type": payload.get("alert_type", "INFRACCION"),
+                        "severity": payload.get("severity", 4),
+                        "signal_id": payload.get("signal_id", "unknown"),
+                        "signal_color": payload.get("signal_color", "red"),
+                        "origen": payload.get("origen", f"Infraccion semaforo {payload.get('signal_id', 'unknown')}"),
+                    }
+                }
+                await self.websocket_manager.emit_alert(alert_data)
+                logger.info(f"Infraction alert emitted via WebSocket: {payload.get('signal_id')}")
+            
             # Process different types of data for WebSocket emission
-            if "alert_type" in payload:
+            elif "alert_type" in payload:
                 # Emit alert
                 alert_data = {
                     "timestamp": time.time(),
@@ -367,6 +384,27 @@ class MQTTService:
                     else:
                         logger.debug(f"Botones_panico_activos is not a list: {type(botones)}")
                 
+                # Process infractions from arduino data
+                if "infracciones" in payload:
+                    infracciones = payload["infracciones"]
+                    if isinstance(infracciones, list) and infracciones:
+                        # Emit infraction alerts for each infraction
+                        for infraccion in infracciones:
+                            signal_id = infraccion if isinstance(infraccion, str) else infraccion.get("signal_id", "unknown")
+                            alert_data = {
+                                "type": "infraction",
+                                "timestamp": time.time(),
+                                "data": {
+                                    "alert_type": "INFRACCION",
+                                    "severity": 4,
+                                    "signal_id": signal_id,
+                                    "signal_color": "red",
+                                    "origen": f"Infraccion semaforo {signal_id}"
+                                }
+                            }
+                            await self.websocket_manager.emit_alert(alert_data)
+                            logger.info(f"Infraction from arduino/data emitted via WebSocket: {signal_id}")
+                
                 # Emit general data update
                 general_data = {
                     "timestamp": time.time(),
@@ -379,3 +417,4 @@ class MQTTService:
             
         except Exception as e:
             logger.error(f"WebSocket emission processing error: {e}")
+

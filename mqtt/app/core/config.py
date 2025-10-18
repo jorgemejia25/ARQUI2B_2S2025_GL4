@@ -20,9 +20,9 @@ class AppSettings(BaseSettings):
     SIMULATION_INTERVAL: float = 2.0  # Seconds between simulation messages
     
     # Serial Configuration
-    SERIAL_PORT: str = "/dev/ttyUSB0"  # Default Arduino port
-    SERIAL_BAUDRATE: int = 9600
-    SERIAL_TIMEOUT: float = 5.0
+    SERIAL_PORT: str = "/dev/ttyACM0"  # Default Arduino port
+    SERIAL_BAUDRATE: int = 115200
+    SERIAL_TIMEOUT: float = 1.0
     
     # Logging Configuration
     LOG_LEVEL: str = "INFO"
@@ -37,7 +37,7 @@ class MQTTSettings(BaseSettings):
     """MQTT-specific settings"""
     
     # MQTT Broker Configuration
-    BROKER: str = "localhost"
+    BROKER: str = "test.mosquitto.org"
     PORT: int = 1883
     USERNAME: str = ""
     PASSWORD: str = ""
@@ -64,9 +64,9 @@ class SerialSettings(BaseSettings):
     """Serial communication settings"""
     
     # Serial Port Configuration
-    SERIAL_PORT: str = "/dev/ttyUSB0"
-    SERIAL_BAUDRATE: int = 9600
-    SERIAL_TIMEOUT: float = 5.0
+    SERIAL_PORT: str = "/dev/ttyACM0"
+    SERIAL_BAUDRATE: int = 115200
+    SERIAL_TIMEOUT: float = 1.0
     
     # Data Processing Settings
     JSON_TIMEOUT: float = 5.0
